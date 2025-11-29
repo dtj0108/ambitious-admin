@@ -105,47 +105,47 @@ export default function SetPasswordPage() {
   return (
     <div className="w-full">
       {/* Logo */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-4">
         <Image
           src="/logo.png"
           alt="Ambitious"
-          width={360}
-          height={120}
-          className="mx-auto mb-8"
+          width={240}
+          height={80}
+          className="mx-auto mb-2"
           priority
         />
-        <h1 className="text-2xl font-bold text-text">Create Password</h1>
-        <p className="text-text-secondary mt-1">Set up your admin account</p>
+        <h1 className="text-lg font-bold text-text">Create Password</h1>
+        <p className="text-sm text-text-secondary">Set up your admin account</p>
       </div>
 
       {/* Password Form */}
-      <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
+      <div className="bg-surface border border-border rounded-2xl p-4 shadow-xl">
         {/* User Info */}
-        <div className="text-center pb-4 mb-4 border-b border-border">
-          <p className="text-text font-medium">{claimInfo.name || 'New Admin'}</p>
-          <p className="text-sm text-text-secondary">{claimInfo.email}</p>
+        <div className="text-center pb-2 mb-3 border-b border-border">
+          <p className="text-sm text-text font-medium">{claimInfo.name || 'New Admin'}</p>
+          <p className="text-xs text-text-secondary">{claimInfo.email}</p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Error Message */}
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-error/10 border border-error/20 rounded-lg text-error text-sm">
-              <AlertCircle size={16} />
+            <div className="flex items-center gap-2 p-2 bg-error/10 border border-error/20 rounded-lg text-error text-xs">
+              <AlertCircle size={14} />
               {error}
             </div>
           )}
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-text mb-1.5">Password</label>
+            <label className="block text-xs font-medium text-text mb-1">Password</label>
             <div className="relative">
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Create a strong password"
-                className="w-full pl-10 pr-12 py-2.5 bg-surface-alt border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                className="w-full pl-9 pr-10 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 required
                 disabled={loading}
                 autoFocus
@@ -155,17 +155,17 @@ export default function SetPasswordPage() {
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 top-1/2 -translate-y-1/2 text-text-tertiary hover:text-text transition-colors"
               >
-                {showPassword ? <EyeOff size={18} /> : <Eye size={18} />}
+                {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
               </button>
             </div>
           </div>
 
-          {/* Password Requirements */}
-          <div className="space-y-1.5">
+          {/* Password Requirements - inline grid */}
+          <div className="grid grid-cols-2 gap-1">
             {passwordRequirements.map((req, i) => (
-              <div key={i} className="flex items-center gap-2 text-xs">
+              <div key={i} className="flex items-center gap-1 text-[10px]">
                 <CheckCircle 
-                  size={14} 
+                  size={12} 
                   className={req.test ? 'text-success' : 'text-text-tertiary'} 
                 />
                 <span className={req.test ? 'text-success' : 'text-text-tertiary'}>
@@ -177,21 +177,21 @@ export default function SetPasswordPage() {
 
           {/* Confirm Password */}
           <div>
-            <label className="block text-sm font-medium text-text mb-1.5">Confirm Password</label>
+            <label className="block text-xs font-medium text-text mb-1">Confirm Password</label>
             <div className="relative">
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
               <input
                 type={showPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Confirm your password"
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-alt border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                className="w-full pl-9 pr-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 required
                 disabled={loading}
               />
             </div>
             {confirmPassword && password !== confirmPassword && (
-              <p className="text-xs text-error mt-1.5">Passwords do not match</p>
+              <p className="text-[10px] text-error mt-1">Passwords do not match</p>
             )}
           </div>
 
@@ -199,23 +199,23 @@ export default function SetPasswordPage() {
           <Button
             type="submit"
             variant="primary"
-            className="w-full"
+            className="w-full !py-2"
             disabled={loading || !isPasswordValid || password !== confirmPassword}
           >
             {loading ? (
               <>
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 Setting up...
               </>
             ) : (
-              'Continue to 2FA Setup'
+              'Continue to 2FA'
             )}
           </Button>
         </form>
       </div>
 
       {/* Footer */}
-      <p className="text-center text-xs text-text-tertiary mt-6">
+      <p className="text-center text-[10px] text-text-tertiary mt-3">
         Next: Set up two-factor authentication
       </p>
     </div>
