@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Button } from '@/components'
-import { Zap, Smartphone, AlertCircle, Loader2, Copy, Check } from 'lucide-react'
+import { Smartphone, AlertCircle, Loader2, Copy, Check } from 'lucide-react'
 
 export default function Setup2FAPage() {
   const router = useRouter()
@@ -100,7 +101,7 @@ export default function Setup2FAPage() {
 
   if (loading) {
     return (
-      <div className="w-full max-w-md text-center">
+      <div className="w-full text-center">
         <Loader2 size={32} className="animate-spin text-primary mx-auto" />
         <p className="text-text-secondary mt-4">Setting up two-factor authentication...</p>
       </div>
@@ -108,12 +109,17 @@ export default function Setup2FAPage() {
   }
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full">
       {/* Logo */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
-          <Zap size={32} className="text-white" />
-        </div>
+        <Image
+          src="/logo.png"
+          alt="Ambitious"
+          width={360}
+          height={120}
+          className="mx-auto mb-8"
+          priority
+        />
         <h1 className="text-2xl font-bold text-text">Set Up 2FA</h1>
         <p className="text-text-secondary mt-1">Scan the QR code with your authenticator app</p>
       </div>
