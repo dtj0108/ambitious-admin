@@ -111,99 +111,93 @@ export default function Setup2FAPage() {
   return (
     <div className="w-full">
       {/* Logo */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-4">
         <Image
           src="/logo.png"
           alt="Ambitious"
-          width={360}
-          height={120}
-          className="mx-auto mb-8"
+          width={240}
+          height={80}
+          className="mx-auto mb-2"
           priority
         />
-        <h1 className="text-2xl font-bold text-text">Set Up 2FA</h1>
-        <p className="text-text-secondary mt-1">Scan the QR code with your authenticator app</p>
+        <h1 className="text-lg font-bold text-text">Set Up 2FA</h1>
+        <p className="text-sm text-text-secondary">Scan with your authenticator app</p>
       </div>
 
       {/* Setup Card */}
-      <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
+      <div className="bg-surface border border-border rounded-2xl p-4 shadow-xl">
         {/* Error Message */}
         {error && (
-          <div className="flex items-center gap-2 p-3 bg-error/10 border border-error/20 rounded-lg text-error text-sm mb-4">
-            <AlertCircle size={16} />
+          <div className="flex items-center gap-2 p-2 bg-error/10 border border-error/20 rounded-lg text-error text-xs mb-3">
+            <AlertCircle size={14} />
             {error}
           </div>
         )}
 
         {/* QR Code */}
-        <div className="text-center mb-6">
-          <div className="bg-white p-4 rounded-xl inline-block mb-4">
+        <div className="text-center mb-3">
+          <div className="bg-white p-2 rounded-lg inline-block mb-2">
             {qrCode && (
-              <img src={qrCode} alt="QR Code" className="w-48 h-48" />
+              <img src={qrCode} alt="QR Code" className="w-36 h-36" />
             )}
           </div>
-          <p className="text-sm text-text-secondary">
-            Scan with Google Authenticator, Authy, or similar app
+          <p className="text-xs text-text-secondary">
+            Scan with Google Authenticator or Authy
           </p>
         </div>
 
         {/* Manual Entry */}
-        <div className="mb-6">
-          <p className="text-xs text-text-tertiary text-center mb-2">
-            Can&apos;t scan? Enter this code manually:
+        <div className="mb-3">
+          <p className="text-[10px] text-text-tertiary text-center mb-1">
+            Can&apos;t scan? Enter manually:
           </p>
-          <div className="flex items-center gap-2 bg-surface-alt p-3 rounded-lg">
-            <code className="flex-1 text-sm font-mono text-text break-all">{secret}</code>
+          <div className="flex items-center gap-1 bg-surface-alt p-2 rounded-lg">
+            <code className="flex-1 text-xs font-mono text-text break-all">{secret}</code>
             <button
               onClick={handleCopySecret}
-              className="p-2 hover:bg-elevated rounded-lg transition-colors"
+              className="p-1.5 hover:bg-elevated rounded transition-colors"
               title="Copy secret"
             >
               {copied ? (
-                <Check size={16} className="text-success" />
+                <Check size={14} className="text-success" />
               ) : (
-                <Copy size={16} className="text-text-secondary" />
+                <Copy size={14} className="text-text-secondary" />
               )}
             </button>
           </div>
         </div>
 
         {/* Verification Form */}
-        <form onSubmit={handleVerify} className="space-y-4">
+        <form onSubmit={handleVerify} className="space-y-3">
           <div>
-            <label className="block text-sm font-medium text-text mb-1.5">
-              Verification Code
+            <label className="block text-xs font-medium text-text mb-1">
+              Enter 6-digit code
             </label>
-            <div className="relative">
-              <Smartphone size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
-              <input
-                type="text"
-                value={token}
-                onChange={(e) => setToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
-                placeholder="000000"
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-alt border border-border rounded-lg text-text text-center text-xl tracking-[0.5em] font-mono placeholder:text-text-tertiary placeholder:tracking-[0.5em] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
-                maxLength={6}
-                required
-                disabled={verifying}
-              />
-            </div>
-            <p className="text-xs text-text-tertiary mt-1.5">
-              Enter the 6-digit code from your authenticator app
-            </p>
+            <input
+              type="text"
+              value={token}
+              onChange={(e) => setToken(e.target.value.replace(/\D/g, '').slice(0, 6))}
+              placeholder="000000"
+              className="w-full py-2 bg-surface-alt border border-border rounded-lg text-text text-center text-lg tracking-[0.4em] font-mono placeholder:text-text-tertiary placeholder:tracking-[0.4em] focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+              maxLength={6}
+              required
+              disabled={verifying}
+            />
           </div>
 
           <Button
             type="submit"
             variant="primary"
-            className="w-full"
+            className="w-full !py-2"
             disabled={verifying || token.length !== 6}
           >
             {verifying ? (
               <>
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 Verifying...
               </>
             ) : (
-              'Verify & Complete Setup'
+              'Complete Setup'
             )}
           </Button>
         </form>

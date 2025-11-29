@@ -51,49 +51,49 @@ export default function ClaimInvitePage() {
   return (
     <div className="w-full">
       {/* Logo */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-4">
         <Image
           src="/logo.png"
           alt="Ambitious"
-          width={360}
-          height={120}
-          className="mx-auto mb-8"
+          width={240}
+          height={80}
+          className="mx-auto mb-2"
           priority
         />
-        <h1 className="text-2xl font-bold text-text">Claim Your Invite</h1>
-        <p className="text-text-secondary mt-1">Enter your email to get started</p>
+        <h1 className="text-lg font-bold text-text">Claim Your Invite</h1>
+        <p className="text-sm text-text-secondary">Enter your email to get started</p>
       </div>
 
       {/* Claim Form */}
-      <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
+      <div className="bg-surface border border-border rounded-2xl p-4 shadow-xl">
         {/* Info Box */}
-        <div className="flex items-start gap-3 p-3 bg-primary/5 border border-primary/20 rounded-lg mb-6">
-          <CheckCircle size={18} className="text-primary mt-0.5 flex-shrink-0" />
-          <p className="text-sm text-text-secondary">
-            If you&apos;ve been invited as an administrator, enter your email address below to set up your account.
+        <div className="flex items-start gap-2 p-2 bg-primary/5 border border-primary/20 rounded-lg mb-4">
+          <CheckCircle size={14} className="text-primary mt-0.5 flex-shrink-0" />
+          <p className="text-xs text-text-secondary">
+            Enter your invited email address to set up your account.
           </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Error Message */}
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-error/10 border border-error/20 rounded-lg text-error text-sm">
-              <AlertCircle size={16} />
+            <div className="flex items-center gap-2 p-2 bg-error/10 border border-error/20 rounded-lg text-error text-xs">
+              <AlertCircle size={14} />
               {error}
             </div>
           )}
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-text mb-1.5">Email Address</label>
+            <label className="block text-xs font-medium text-text mb-1">Email Address</label>
             <div className="relative">
-              <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="your@email.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-alt border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                className="w-full pl-9 pr-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 required
                 disabled={loading}
                 autoFocus
@@ -105,12 +105,12 @@ export default function ClaimInvitePage() {
           <Button
             type="submit"
             variant="primary"
-            className="w-full"
+            className="w-full !py-2"
             disabled={loading}
           >
             {loading ? (
               <>
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 Checking...
               </>
             ) : (
@@ -121,17 +121,17 @@ export default function ClaimInvitePage() {
           {/* Back Link */}
           <Link 
             href="/login" 
-            className="flex items-center justify-center gap-2 w-full py-2 text-text-secondary hover:text-text transition-colors"
+            className="flex items-center justify-center gap-1 w-full py-1.5 text-xs text-text-secondary hover:text-text transition-colors"
           >
-            <ArrowLeft size={16} />
+            <ArrowLeft size={14} />
             Back to login
           </Link>
         </form>
       </div>
 
       {/* Footer */}
-      <p className="text-center text-xs text-text-tertiary mt-6">
-        Don&apos;t have an invite? Contact your administrator.
+      <p className="text-center text-[10px] text-text-tertiary mt-3">
+        No invite? Contact your administrator.
       </p>
     </div>
   )

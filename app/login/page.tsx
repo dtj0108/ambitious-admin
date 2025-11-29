@@ -57,41 +57,40 @@ export default function LoginPage() {
   return (
     <div className="w-full">
       {/* Logo */}
-      <div className="text-center mb-8">
+      <div className="text-center mb-4">
         <Image
           src="/logo.png"
           alt="Ambitious"
-          width={360}
-          height={120}
-          className="mx-auto mb-8"
+          width={240}
+          height={80}
+          className="mx-auto mb-2"
           priority
         />
-        <h1 className="text-2xl font-bold text-text">Admin Portal</h1>
-        <p className="text-text-secondary mt-1">Sign in to continue</p>
+        <p className="text-sm text-text-secondary">Admin Portal</p>
       </div>
 
       {/* Login Form */}
-      <div className="bg-surface border border-border rounded-2xl p-6 shadow-xl">
-        <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="bg-surface border border-border rounded-2xl p-5 shadow-xl">
+        <form onSubmit={handleSubmit} className="space-y-3">
           {/* Error Message */}
           {error && (
-            <div className="flex items-center gap-2 p-3 bg-error/10 border border-error/20 rounded-lg text-error text-sm">
-              <AlertCircle size={16} />
+            <div className="flex items-center gap-2 p-2.5 bg-error/10 border border-error/20 rounded-lg text-error text-sm">
+              <AlertCircle size={14} />
               {error}
             </div>
           )}
 
           {/* Email */}
           <div>
-            <label className="block text-sm font-medium text-text mb-1.5">Email</label>
+            <label className="block text-xs font-medium text-text mb-1">Email</label>
             <div className="relative">
-              <Mail size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <Mail size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
               <input
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 placeholder="admin@example.com"
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-alt border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                className="w-full pl-9 pr-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 required
                 disabled={loading}
               />
@@ -100,15 +99,15 @@ export default function LoginPage() {
 
           {/* Password */}
           <div>
-            <label className="block text-sm font-medium text-text mb-1.5">Password</label>
+            <label className="block text-xs font-medium text-text mb-1">Password</label>
             <div className="relative">
-              <Lock size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
+              <Lock size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-text-tertiary" />
               <input
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
-                className="w-full pl-10 pr-4 py-2.5 bg-surface-alt border border-border rounded-lg text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
+                className="w-full pl-9 pr-3 py-2 bg-surface-alt border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary transition-colors"
                 required
                 disabled={loading}
               />
@@ -119,12 +118,12 @@ export default function LoginPage() {
           <Button
             type="submit"
             variant="primary"
-            className="w-full"
+            className="w-full !py-2"
             disabled={loading}
           >
             {loading ? (
               <>
-                <Loader2 size={18} className="animate-spin" />
+                <Loader2 size={16} className="animate-spin" />
                 Signing in...
               </>
             ) : (
@@ -134,24 +133,19 @@ export default function LoginPage() {
         </form>
 
         {/* New Admin CTA */}
-        <div className="mt-6 pt-6 border-t border-border">
-          <p className="text-center text-sm text-text-secondary mb-3">
-            Got an invite from your team?
-          </p>
+        <div className="mt-4 pt-4 border-t border-border">
           <Link 
             href="/login/claim" 
-            className="group flex items-center justify-center gap-3 w-full py-3 px-4 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl text-primary font-medium hover:from-primary/20 hover:to-primary/10 hover:border-primary/30 transition-all duration-200"
+            className="group flex items-center justify-center gap-2 w-full py-2 px-3 bg-primary/5 border border-primary/20 rounded-lg text-primary text-sm font-medium hover:bg-primary/10 transition-all"
           >
-            <div className="p-1.5 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
-              <UserPlus size={18} />
-            </div>
-            Set Up My Account
+            <UserPlus size={16} />
+            New? Set Up My Account
           </Link>
         </div>
       </div>
 
       {/* Footer */}
-      <p className="text-center text-xs text-text-tertiary mt-6">
+      <p className="text-center text-[10px] text-text-tertiary mt-3">
         Protected by two-factor authentication
       </p>
     </div>
