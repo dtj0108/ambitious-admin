@@ -49,15 +49,15 @@ export default function ClaimInvitePage() {
   }
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full">
       {/* Logo */}
       <div className="text-center mb-8">
         <Image
           src="/logo.png"
           alt="Ambitious"
-          width={180}
-          height={60}
-          className="mx-auto mb-4"
+          width={360}
+          height={120}
+          className="mx-auto mb-8"
           priority
         />
         <h1 className="text-2xl font-bold text-text">Claim Your Invite</h1>

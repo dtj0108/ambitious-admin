@@ -55,15 +55,15 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="w-full max-w-md">
+    <div className="w-full">
       {/* Logo */}
       <div className="text-center mb-8">
         <Image
           src="/logo.png"
           alt="Ambitious"
-          width={180}
-          height={60}
-          className="mx-auto mb-4"
+          width={360}
+          height={120}
+          className="mx-auto mb-8"
           priority
         />
         <h1 className="text-2xl font-bold text-text">Admin Portal</h1>
@@ -133,21 +133,21 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {/* Divider */}
-        <div className="relative my-6">
-          <div className="absolute inset-0 flex items-center">
-            <div className="w-full border-t border-border"></div>
-          </div>
-          <div className="relative flex justify-center text-xs uppercase">
-            <span className="bg-surface px-2 text-text-tertiary">or</span>
-          </div>
+        {/* New Admin CTA */}
+        <div className="mt-6 pt-6 border-t border-border">
+          <p className="text-center text-sm text-text-secondary mb-3">
+            Got an invite from your team?
+          </p>
+          <Link 
+            href="/login/claim" 
+            className="group flex items-center justify-center gap-3 w-full py-3 px-4 bg-gradient-to-r from-primary/10 to-primary/5 border border-primary/20 rounded-xl text-primary font-medium hover:from-primary/20 hover:to-primary/10 hover:border-primary/30 transition-all duration-200"
+          >
+            <div className="p-1.5 bg-primary/10 rounded-lg group-hover:bg-primary/20 transition-colors">
+              <UserPlus size={18} />
+            </div>
+            Set Up My Account
+          </Link>
         </div>
-
-        {/* I'm New Link */}
-        <Link href="/login/claim" className="flex items-center justify-center gap-2 w-full py-2.5 border border-border rounded-lg text-text-secondary hover:text-text hover:bg-surface-alt transition-colors">
-          <UserPlus size={18} />
-          I&apos;m New - Claim My Invite
-        </Link>
       </div>
 
       {/* Footer */}
