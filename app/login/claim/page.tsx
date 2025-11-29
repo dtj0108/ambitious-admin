@@ -3,8 +3,9 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import Image from 'next/image'
 import { Button } from '@/components'
-import { Zap, Mail, AlertCircle, Loader2, ArrowLeft, CheckCircle } from 'lucide-react'
+import { Mail, AlertCircle, Loader2, ArrowLeft, CheckCircle } from 'lucide-react'
 
 export default function ClaimInvitePage() {
   const router = useRouter()
@@ -51,9 +52,14 @@ export default function ClaimInvitePage() {
     <div className="w-full max-w-md">
       {/* Logo */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
-          <Zap size={32} className="text-white" />
-        </div>
+        <Image
+          src="/logo.webp"
+          alt="Ambitious"
+          width={180}
+          height={60}
+          className="mx-auto mb-4"
+          priority
+        />
         <h1 className="text-2xl font-bold text-text">Claim Your Invite</h1>
         <p className="text-text-secondary mt-1">Enter your email to get started</p>
       </div>

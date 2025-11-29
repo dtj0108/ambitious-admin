@@ -2,8 +2,9 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
+import Image from 'next/image'
 import { Button } from '@/components'
-import { Zap, Lock, AlertCircle, Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react'
+import { Lock, AlertCircle, Loader2, CheckCircle, Eye, EyeOff } from 'lucide-react'
 
 export default function SetPasswordPage() {
   const router = useRouter()
@@ -105,9 +106,14 @@ export default function SetPasswordPage() {
     <div className="w-full max-w-md">
       {/* Logo */}
       <div className="text-center mb-8">
-        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-primary to-primary-dark flex items-center justify-center mx-auto mb-4 shadow-lg shadow-primary/20">
-          <Zap size={32} className="text-white" />
-        </div>
+        <Image
+          src="/logo.webp"
+          alt="Ambitious"
+          width={180}
+          height={60}
+          className="mx-auto mb-4"
+          priority
+        />
         <h1 className="text-2xl font-bold text-text">Create Password</h1>
         <p className="text-text-secondary mt-1">Set up your admin account</p>
       </div>
