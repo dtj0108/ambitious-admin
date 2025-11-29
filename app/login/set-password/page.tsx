@@ -107,7 +107,7 @@ export default function SetPasswordPage() {
       {/* Logo */}
       <div className="text-center mb-8">
         <Image
-          src="/logo.webp"
+          src="/logo.png"
           alt="Ambitious"
           width={180}
           height={60}
