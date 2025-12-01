@@ -15,6 +15,7 @@ const publicPaths = [
   '/api/auth/verify-totp',
   '/api/auth/claim',
   '/api/auth/set-password',
+  '/api/execute-query',  // OpenAI agent endpoint (has its own API key auth)
 ]
 
 export async function middleware(request: NextRequest) {

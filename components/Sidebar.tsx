@@ -17,12 +17,14 @@ import {
   ChevronRight,
   Zap,
   Shield,
+  MessageCircle,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const mainNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Chat', href: '/chat', icon: MessageCircle },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Posts', href: '/posts', icon: FileText },
   { name: 'Comments', href: '/comments', icon: MessageSquare },

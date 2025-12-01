@@ -1,5 +1,6 @@
 export { Button } from './Button'
 export { Card, CardHeader, CardTitle, CardContent } from './Card'
+export { ChatMessage, TypingIndicator } from './ChatMessage'
 export { CommentDetailModal } from './CommentDetailModal'
 export { DataTable } from './DataTable'
 export { EmptyState } from './EmptyState'
