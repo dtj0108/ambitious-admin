@@ -23,7 +23,7 @@ export async function POST(request: Request) {
     )
   }
 
-  const { message } = body
+  const { message, history } = body
 
   if (!message || typeof message !== 'string') {
     return NextResponse.json(
@@ -40,7 +40,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await runAgentChat({ message })
+    const result = await runAgentChat({ message, history })
 
     return NextResponse.json({
       response: result.response,

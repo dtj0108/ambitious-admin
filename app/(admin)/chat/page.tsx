@@ -50,6 +50,12 @@ export default function ChatPage() {
       timestamp: new Date()
     }
 
+    // Build history from current messages (before adding the new one)
+    const historyForApi = messages.map(m => ({
+      role: m.role,
+      content: m.content
+    }))
+
     setMessages(prev => [...prev, userMessage])
     setInput('')
     setIsLoading(true)
@@ -60,7 +66,10 @@ export default function ChatPage() {
         headers: {
           'Content-Type': 'application/json'
         },
-        body: JSON.stringify({ message: messageText.trim() })
+        body: JSON.stringify({ 
+          message: messageText.trim(),
+          history: historyForApi
+        })
       })
 
       const data = await response.json()
