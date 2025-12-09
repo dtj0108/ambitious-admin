@@ -17,12 +17,14 @@ import {
   ChevronRight,
   Zap,
   Shield,
+  BarChart3,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
 
 const mainNavigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
   { name: 'Users', href: '/users', icon: Users },
   { name: 'Posts', href: '/posts', icon: FileText },
   { name: 'Comments', href: '/comments', icon: MessageSquare },
