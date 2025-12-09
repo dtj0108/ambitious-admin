@@ -3303,6 +3303,905 @@ export async function updateSpotlightOrder(spotlightId: string, newOrder: number
   }
 }
 
+// ===== ANALYTICS EVENTS =====
+
+export type AnalyticsPlatform = 'web' | 'ios' | 'android' | 'all'
+export type AnalyticsDateRange = 'today' | '7d' | '30d' | '90d' | 'all'
+
+export interface AnalyticsOverview {
+  totalEvents: number
+  uniqueUsers: number
+  uniqueSessions: number
+  avgEventsPerSession: number
+  platformBreakdown: Record<string, number>
+}
+
+export interface AnalyticsFilters {
+  dateRange?: AnalyticsDateRange
+  platform?: AnalyticsPlatform
+  eventType?: string
+}
+
+function getAnalyticsStartDate(dateRange: AnalyticsDateRange): string | null {
+  switch (dateRange) {
+    case 'today':
+      return getStartOfToday()
+    case '7d':
+      return getDaysAgo(7)
+    case '30d':
+      return getDaysAgo(30)
+    case '90d':
+      return getDaysAgo(90)
+    case 'all':
+      return null
+  }
+}
+
+export async function getAnalyticsOverview(filters: AnalyticsFilters = {}): Promise<AnalyticsOverview> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { totalEvents: 0, uniqueUsers: 0, uniqueSessions: 0, avgEventsPerSession: 0, platformBreakdown: {} }
+  }
+
+  const { dateRange = '7d', platform = 'all', eventType } = filters
+  const startDate = getAnalyticsStartDate(dateRange)
+
+  try {
+    let query = supabase.from('analytics_events').select('id, user_id, session_id, platform')
+
+    if (startDate) {
+      query = query.gte('created_at', startDate)
+    }
+    if (platform && platform !== 'all') {
+      query = query.eq('platform', platform)
+    }
+    if (eventType) {
+      query = query.eq('event_name', eventType)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching analytics overview:', error)
+      return { totalEvents: 0, uniqueUsers: 0, uniqueSessions: 0, avgEventsPerSession: 0, platformBreakdown: {} }
+    }
+
+    const totalEvents = data?.length || 0
+    const uniqueUsers = new Set(data?.map(e => e.user_id).filter(Boolean)).size
+    const uniqueSessions = new Set(data?.map(e => e.session_id).filter(Boolean)).size
+    const avgEventsPerSession = uniqueSessions > 0 ? Math.round((totalEvents / uniqueSessions) * 10) / 10 : 0
+
+    // Platform breakdown
+    const platformBreakdown: Record<string, number> = {}
+    data?.forEach(e => {
+      const p = e.platform || 'unknown'
+      platformBreakdown[p] = (platformBreakdown[p] || 0) + 1
+    })
+
+    return { totalEvents, uniqueUsers, uniqueSessions, avgEventsPerSession, platformBreakdown }
+  } catch (error) {
+    console.error('Error fetching analytics overview:', error)
+    return { totalEvents: 0, uniqueUsers: 0, uniqueSessions: 0, avgEventsPerSession: 0, platformBreakdown: {} }
+  }
+}
+
+export interface EventsTrendPoint {
+  date: string
+  label: string
+  count: number
+  byPlatform: Record<string, number>
+}
+
+export async function getEventsOverTime(days: number = 7, filters: AnalyticsFilters = {}): Promise<EventsTrendPoint[]> {
+  if (!isSupabaseConfigured || !supabase) return []
+
+  const { platform = 'all', eventType } = filters
+  const startDate = getDaysAgo(days)
+  const now = new Date()
+
+  try {
+    let query = supabase.from('analytics_events').select('created_at, platform').gte('created_at', startDate)
+
+    if (platform && platform !== 'all') {
+      query = query.eq('platform', platform)
+    }
+    if (eventType) {
+      query = query.eq('event_name', eventType)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching events trend:', error)
+      return []
+    }
+
+    // Build activity by day
+    const activityMap = new Map<string, { count: number; byPlatform: Record<string, number> }>()
+
+    // Initialize all days with 0
+    for (let i = days - 1; i >= 0; i--) {
+      const date = new Date(now)
+      date.setDate(date.getDate() - i)
+      date.setHours(0, 0, 0, 0)
+      const dateStr = date.toISOString().split('T')[0]
+      activityMap.set(dateStr, { count: 0, byPlatform: {} })
+    }
+
+    // Count events per day
+    data?.forEach(e => {
+      const dateStr = new Date(e.created_at).toISOString().split('T')[0]
+      if (activityMap.has(dateStr)) {
+        const dayData = activityMap.get(dateStr)!
+        dayData.count++
+        const p = e.platform || 'unknown'
+        dayData.byPlatform[p] = (dayData.byPlatform[p] || 0) + 1
+      }
+    })
+
+    // Convert to array
+    return Array.from(activityMap.entries()).map(([date, data]) => {
+      const d = new Date(date)
+      return {
+        date,
+        label: d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' }),
+        count: data.count,
+        byPlatform: data.byPlatform,
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching events trend:', error)
+    return []
+  }
+}
+
+export interface TopEvent {
+  eventName: string
+  count: number
+  percentage: number
+}
+
+export async function getTopEvents(limit: number = 10, filters: AnalyticsFilters = {}): Promise<TopEvent[]> {
+  if (!isSupabaseConfigured || !supabase) return []
+
+  const { dateRange = '7d', platform = 'all' } = filters
+  const startDate = getAnalyticsStartDate(dateRange)
+
+  try {
+    let query = supabase.from('analytics_events').select('event_name')
+
+    if (startDate) {
+      query = query.gte('created_at', startDate)
+    }
+    if (platform && platform !== 'all') {
+      query = query.eq('platform', platform)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching top events:', error)
+      return []
+    }
+
+    // Count by event name
+    const eventCounts: Record<string, number> = {}
+    data?.forEach(e => {
+      const name = e.event_name || 'unknown'
+      eventCounts[name] = (eventCounts[name] || 0) + 1
+    })
+
+    const total = data?.length || 1
+
+    // Sort and take top N
+    return Object.entries(eventCounts)
+      .map(([eventName, count]) => ({
+        eventName,
+        count,
+        percentage: Math.round((count / total) * 1000) / 10,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, limit)
+  } catch (error) {
+    console.error('Error fetching top events:', error)
+    return []
+  }
+}
+
+export interface PlatformStats {
+  platform: string
+  count: number
+  percentage: number
+  color: string
+}
+
+export async function getPlatformBreakdown(filters: AnalyticsFilters = {}): Promise<PlatformStats[]> {
+  if (!isSupabaseConfigured || !supabase) return []
+
+  const { dateRange = '7d' } = filters
+  const startDate = getAnalyticsStartDate(dateRange)
+
+  try {
+    let query = supabase.from('analytics_events').select('platform')
+
+    if (startDate) {
+      query = query.gte('created_at', startDate)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching platform breakdown:', error)
+      return []
+    }
+
+    // Count by platform
+    const platformCounts: Record<string, number> = {}
+    data?.forEach(e => {
+      const p = e.platform || 'unknown'
+      platformCounts[p] = (platformCounts[p] || 0) + 1
+    })
+
+    const total = data?.length || 1
+    const platformColors: Record<string, string> = {
+      web: '#4A9EFF',
+      ios: '#FF9500',
+      android: '#00C853',
+      unknown: '#909090',
+    }
+
+    return Object.entries(platformCounts)
+      .map(([platform, count]) => ({
+        platform,
+        count,
+        percentage: Math.round((count / total) * 1000) / 10,
+        color: platformColors[platform] || '#909090',
+      }))
+      .sort((a, b) => b.count - a.count)
+  } catch (error) {
+    console.error('Error fetching platform breakdown:', error)
+    return []
+  }
+}
+
+export interface AnalyticsRetention {
+  dau: number
+  wau: number
+  mau: number
+  dauWauRatio: number
+  dauMauRatio: number
+}
+
+export async function getAnalyticsRetention(): Promise<AnalyticsRetention> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { dau: 0, wau: 0, mau: 0, dauWauRatio: 0, dauMauRatio: 0 }
+  }
+
+  try {
+    const startOfToday = getStartOfToday()
+    const sevenDaysAgo = getDaysAgo(7)
+    const thirtyDaysAgo = getDaysAgo(30)
+
+    const [dauResult, wauResult, mauResult] = await Promise.all([
+      supabase.from('analytics_events').select('user_id').gte('created_at', startOfToday),
+      supabase.from('analytics_events').select('user_id').gte('created_at', sevenDaysAgo),
+      supabase.from('analytics_events').select('user_id').gte('created_at', thirtyDaysAgo),
+    ])
+
+    const dau = new Set(dauResult.data?.map(e => e.user_id).filter(Boolean)).size
+    const wau = new Set(wauResult.data?.map(e => e.user_id).filter(Boolean)).size
+    const mau = new Set(mauResult.data?.map(e => e.user_id).filter(Boolean)).size
+
+    const dauWauRatio = wau > 0 ? Math.round((dau / wau) * 100) : 0
+    const dauMauRatio = mau > 0 ? Math.round((dau / mau) * 100) : 0
+
+    return { dau, wau, mau, dauWauRatio, dauMauRatio }
+  } catch (error) {
+    console.error('Error fetching analytics retention:', error)
+    return { dau: 0, wau: 0, mau: 0, dauWauRatio: 0, dauMauRatio: 0 }
+  }
+}
+
+export interface FunnelStep {
+  name: string
+  eventName: string
+  count: number
+  conversionRate: number
+  dropOffRate: number
+}
+
+export async function getUserFunnelData(filters: AnalyticsFilters = {}): Promise<FunnelStep[]> {
+  if (!isSupabaseConfigured || !supabase) return []
+
+  const { dateRange = '30d', platform = 'all' } = filters
+  const startDate = getAnalyticsStartDate(dateRange)
+
+  // Define the funnel steps - common user journey events
+  const funnelEvents = [
+    { name: 'App Open', eventName: 'app_open' },
+    { name: 'Sign Up', eventName: 'signup_complete' },
+    { name: 'Profile Setup', eventName: 'profile_setup' },
+    { name: 'First Post', eventName: 'post_created' },
+    { name: 'First Comment', eventName: 'comment_created' },
+  ]
+
+  try {
+    let query = supabase.from('analytics_events').select('event_name, user_id')
+
+    if (startDate) {
+      query = query.gte('created_at', startDate)
+    }
+    if (platform && platform !== 'all') {
+      query = query.eq('platform', platform)
+    }
+    query = query.in('event_name', funnelEvents.map(f => f.eventName))
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching funnel data:', error)
+      return []
+    }
+
+    // Count unique users per event
+    const eventUserCounts: Record<string, Set<string>> = {}
+    funnelEvents.forEach(f => {
+      eventUserCounts[f.eventName] = new Set()
+    })
+
+    data?.forEach(e => {
+      if (e.user_id && eventUserCounts[e.event_name]) {
+        eventUserCounts[e.event_name].add(e.user_id)
+      }
+    })
+
+    // Build funnel with conversion rates
+    let previousCount = 0
+    return funnelEvents.map((step, index) => {
+      const count = eventUserCounts[step.eventName].size
+      const conversionRate = index === 0 ? 100 : (previousCount > 0 ? Math.round((count / previousCount) * 100) : 0)
+      const dropOffRate = 100 - conversionRate
+
+      previousCount = count > 0 ? count : previousCount // Don't let 0 break the chain
+
+      return {
+        name: step.name,
+        eventName: step.eventName,
+        count,
+        conversionRate,
+        dropOffRate: index === 0 ? 0 : dropOffRate,
+      }
+    })
+  } catch (error) {
+    console.error('Error fetching funnel data:', error)
+    return []
+  }
+}
+
+export interface SessionInsight {
+  avgEventsPerSession: number
+  avgSessionDurationMinutes: number
+  topPages: { url: string; count: number }[]
+  bounceRate: number
+}
+
+export async function getSessionInsights(filters: AnalyticsFilters = {}): Promise<SessionInsight> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { avgEventsPerSession: 0, avgSessionDurationMinutes: 0, topPages: [], bounceRate: 0 }
+  }
+
+  const { dateRange = '7d', platform = 'all' } = filters
+  const startDate = getAnalyticsStartDate(dateRange)
+
+  try {
+    let query = supabase.from('analytics_events').select('session_id, page_url, created_at')
+
+    if (startDate) {
+      query = query.gte('created_at', startDate)
+    }
+    if (platform && platform !== 'all') {
+      query = query.eq('platform', platform)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching session insights:', error)
+      return { avgEventsPerSession: 0, avgSessionDurationMinutes: 0, topPages: [], bounceRate: 0 }
+    }
+
+    // Group by session
+    const sessions: Record<string, { events: number; pages: Set<string>; times: number[] }> = {}
+    const pageCounts: Record<string, number> = {}
+
+    data?.forEach(e => {
+      const sessionId = e.session_id || 'unknown'
+      if (!sessions[sessionId]) {
+        sessions[sessionId] = { events: 0, pages: new Set(), times: [] }
+      }
+      sessions[sessionId].events++
+      if (e.page_url) {
+        sessions[sessionId].pages.add(e.page_url)
+        pageCounts[e.page_url] = (pageCounts[e.page_url] || 0) + 1
+      }
+      if (e.created_at) {
+        sessions[sessionId].times.push(new Date(e.created_at).getTime())
+      }
+    })
+
+    const sessionValues = Object.values(sessions)
+    const totalSessions = sessionValues.length || 1
+    const totalEvents = data?.length || 0
+
+    // Average events per session
+    const avgEventsPerSession = Math.round((totalEvents / totalSessions) * 10) / 10
+
+    // Average session duration (difference between first and last event in session)
+    let totalDuration = 0
+    let durationSessions = 0
+    sessionValues.forEach(s => {
+      if (s.times.length > 1) {
+        const duration = Math.max(...s.times) - Math.min(...s.times)
+        totalDuration += duration
+        durationSessions++
+      }
+    })
+    const avgSessionDurationMinutes = durationSessions > 0 
+      ? Math.round((totalDuration / durationSessions / 60000) * 10) / 10 
+      : 0
+
+    // Bounce rate (sessions with only 1 event)
+    const singleEventSessions = sessionValues.filter(s => s.events === 1).length
+    const bounceRate = Math.round((singleEventSessions / totalSessions) * 100)
+
+    // Top pages
+    const topPages = Object.entries(pageCounts)
+      .map(([url, count]) => ({ url, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 5)
+
+    return { avgEventsPerSession, avgSessionDurationMinutes, topPages, bounceRate }
+  } catch (error) {
+    console.error('Error fetching session insights:', error)
+    return { avgEventsPerSession: 0, avgSessionDurationMinutes: 0, topPages: [], bounceRate: 0 }
+  }
+}
+
+export async function getUniqueEventNames(): Promise<string[]> {
+  if (!isSupabaseConfigured || !supabase) return []
+
+  try {
+    const { data, error } = await supabase
+      .from('analytics_events')
+      .select('event_name')
+
+    if (error) {
+      console.error('Error fetching event names:', error)
+      return []
+    }
+
+    const uniqueNames = [...new Set(data?.map(e => e.event_name).filter(Boolean))]
+    return uniqueNames.sort()
+  } catch (error) {
+    console.error('Error fetching event names:', error)
+    return []
+  }
+}
+
+// Aggregate function to fetch all analytics data at once
+export interface AnalyticsData {
+  overview: AnalyticsOverview
+  trend: EventsTrendPoint[]
+  topEvents: TopEvent[]
+  platformBreakdown: PlatformStats[]
+  retention: AnalyticsRetention
+  funnel: FunnelStep[]
+  sessionInsights: SessionInsight
+}
+
+export async function getAnalyticsData(filters: AnalyticsFilters = {}): Promise<AnalyticsData> {
+  const daysMap: Record<AnalyticsDateRange, number> = {
+    'today': 1,
+    '7d': 7,
+    '30d': 30,
+    '90d': 90,
+    'all': 90,
+  }
+  const days = daysMap[filters.dateRange || '7d']
+
+  const [overview, trend, topEvents, platformBreakdown, retention, funnel, sessionInsights] = await Promise.all([
+    getAnalyticsOverview(filters),
+    getEventsOverTime(days, filters),
+    getTopEvents(10, filters),
+    getPlatformBreakdown(filters),
+    getAnalyticsRetention(),
+    getUserFunnelData(filters),
+    getSessionInsights(filters),
+  ])
+
+  return { overview, trend, topEvents, platformBreakdown, retention, funnel, sessionInsights }
+}
+
+// ===== KEY EVENTS & ENGAGEMENT METRICS =====
+
+export interface KeyEventsMetrics {
+  impressionsToday: number
+  impressionsWeek: number
+  impressionsMonth: number
+  impressionsTrend: 'up' | 'down' | 'neutral'
+  trendPercentage: number
+  previousWeekImpressions: number
+}
+
+export async function getKeyEventsMetrics(filters: AnalyticsFilters = {}): Promise<KeyEventsMetrics> {
+  if (!isSupabaseConfigured || !supabase) {
+    return { 
+      impressionsToday: 0, 
+      impressionsWeek: 0, 
+      impressionsMonth: 0, 
+      impressionsTrend: 'neutral', 
+      trendPercentage: 0,
+      previousWeekImpressions: 0
+    }
+  }
+
+  const { platform = 'all' } = filters
+  const startOfToday = getStartOfToday()
+  const sevenDaysAgo = getDaysAgo(7)
+  const thirtyDaysAgo = getDaysAgo(30)
+  const fourteenDaysAgo = getDaysAgo(14)
+
+  // Impression event names to look for
+  const impressionEvents = ['impression', 'post_viewed', 'screen_viewed', 'page_view', 'view']
+
+  try {
+    // Build base query helper
+    const buildQuery = (startDate: string) => {
+      let query = supabase
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', startDate)
+
+      // Filter for impression-type events
+      query = query.or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(','))
+
+      if (platform && platform !== 'all') {
+        query = query.eq('platform', platform)
+      }
+      return query
+    }
+
+    const [todayResult, weekResult, monthResult, prevWeekResult] = await Promise.all([
+      buildQuery(startOfToday),
+      buildQuery(sevenDaysAgo),
+      buildQuery(thirtyDaysAgo),
+      // Previous week (7-14 days ago) for trend comparison
+      supabase
+        .from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', fourteenDaysAgo)
+        .lt('created_at', sevenDaysAgo)
+        .or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(','))
+    ])
+
+    const impressionsToday = todayResult.count || 0
+    const impressionsWeek = weekResult.count || 0
+    const impressionsMonth = monthResult.count || 0
+    const previousWeekImpressions = prevWeekResult.count || 0
+
+    // Calculate trend
+    let impressionsTrend: 'up' | 'down' | 'neutral' = 'neutral'
+    let trendPercentage = 0
+
+    if (previousWeekImpressions > 0) {
+      const diff = impressionsWeek - previousWeekImpressions
+      trendPercentage = Math.round((diff / previousWeekImpressions) * 100)
+      if (trendPercentage > 0) {
+        impressionsTrend = 'up'
+      } else if (trendPercentage < 0) {
+        impressionsTrend = 'down'
+        trendPercentage = Math.abs(trendPercentage)
+      }
+    } else if (impressionsWeek > 0) {
+      impressionsTrend = 'up'
+      trendPercentage = 100
+    }
+
+    return { 
+      impressionsToday, 
+      impressionsWeek, 
+      impressionsMonth, 
+      impressionsTrend, 
+      trendPercentage,
+      previousWeekImpressions
+    }
+  } catch (error) {
+    console.error('Error fetching key events metrics:', error)
+    return { 
+      impressionsToday: 0, 
+      impressionsWeek: 0, 
+      impressionsMonth: 0, 
+      impressionsTrend: 'neutral', 
+      trendPercentage: 0,
+      previousWeekImpressions: 0
+    }
+  }
+}
+
+export interface EngagementPeriod {
+  today: number
+  week: number
+  month: number
+}
+
+export interface EngagementMetrics {
+  likes: EngagementPeriod
+  comments: EngagementPeriod
+  shares: EngagementPeriod
+  follows: EngagementPeriod
+  totalEngagement: number
+  engagementRate: number
+}
+
+export async function getEngagementMetrics(filters: AnalyticsFilters = {}): Promise<EngagementMetrics> {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      likes: { today: 0, week: 0, month: 0 },
+      comments: { today: 0, week: 0, month: 0 },
+      shares: { today: 0, week: 0, month: 0 },
+      follows: { today: 0, week: 0, month: 0 },
+      totalEngagement: 0,
+      engagementRate: 0,
+    }
+  }
+
+  const { platform = 'all' } = filters
+  const startOfToday = getStartOfToday()
+  const sevenDaysAgo = getDaysAgo(7)
+  const thirtyDaysAgo = getDaysAgo(30)
+
+  // Event name patterns for each engagement type
+  const eventPatterns = {
+    likes: ['like', 'post_liked', 'liked'],
+    comments: ['comment', 'comment_created', 'commented'],
+    shares: ['share', 'post_shared', 'shared', 'repost'],
+    follows: ['follow', 'user_followed', 'followed'],
+  }
+
+  try {
+    // Get all engagement events
+    let query = supabase
+      .from('analytics_events')
+      .select('event_name, created_at')
+      .gte('created_at', thirtyDaysAgo)
+
+    if (platform && platform !== 'all') {
+      query = query.eq('platform', platform)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching engagement metrics:', error)
+      throw error
+    }
+
+    // Helper to categorize event
+    const categorizeEvent = (eventName: string): keyof typeof eventPatterns | null => {
+      const name = eventName.toLowerCase()
+      for (const [category, patterns] of Object.entries(eventPatterns)) {
+        if (patterns.some(p => name.includes(p))) {
+          return category as keyof typeof eventPatterns
+        }
+      }
+      return null
+    }
+
+    // Initialize counts
+    const counts = {
+      likes: { today: 0, week: 0, month: 0 },
+      comments: { today: 0, week: 0, month: 0 },
+      shares: { today: 0, week: 0, month: 0 },
+      follows: { today: 0, week: 0, month: 0 },
+    }
+
+    const todayDate = new Date(startOfToday)
+    const weekDate = new Date(sevenDaysAgo)
+
+    // Count events by category and time period
+    data?.forEach(event => {
+      const category = categorizeEvent(event.event_name)
+      if (!category) return
+
+      const eventDate = new Date(event.created_at)
+      
+      // Month (all data is within month already)
+      counts[category].month++
+      
+      // Week
+      if (eventDate >= weekDate) {
+        counts[category].week++
+      }
+      
+      // Today
+      if (eventDate >= todayDate) {
+        counts[category].today++
+      }
+    })
+
+    // Calculate total engagement (this month)
+    const totalEngagement = counts.likes.month + counts.comments.month + counts.shares.month + counts.follows.month
+
+    // Get impressions for engagement rate calculation
+    const keyEvents = await getKeyEventsMetrics(filters)
+    const engagementRate = keyEvents.impressionsMonth > 0 
+      ? Math.round((totalEngagement / keyEvents.impressionsMonth) * 1000) / 10 
+      : 0
+
+    return {
+      likes: counts.likes,
+      comments: counts.comments,
+      shares: counts.shares,
+      follows: counts.follows,
+      totalEngagement,
+      engagementRate,
+    }
+  } catch (error) {
+    console.error('Error fetching engagement metrics:', error)
+    return {
+      likes: { today: 0, week: 0, month: 0 },
+      comments: { today: 0, week: 0, month: 0 },
+      shares: { today: 0, week: 0, month: 0 },
+      follows: { today: 0, week: 0, month: 0 },
+      totalEngagement: 0,
+      engagementRate: 0,
+    }
+  }
+}
+
+// ===== LOOP METRICS =====
+
+export interface LoopPeriod {
+  today: number
+  week: number
+  month: number
+}
+
+export interface LoopMetrics {
+  views: LoopPeriod
+  likes: LoopPeriod
+  comments: LoopPeriod
+  totalLoopsViewed: number
+  uniqueViewers: number
+  uniqueLoops: number
+  avgViewsPerLoop: number
+}
+
+export async function getLoopMetrics(filters: AnalyticsFilters = {}): Promise<LoopMetrics> {
+  if (!isSupabaseConfigured || !supabase) {
+    return {
+      views: { today: 0, week: 0, month: 0 },
+      likes: { today: 0, week: 0, month: 0 },
+      comments: { today: 0, week: 0, month: 0 },
+      totalLoopsViewed: 0,
+      uniqueViewers: 0,
+      uniqueLoops: 0,
+      avgViewsPerLoop: 0,
+    }
+  }
+
+  const { platform = 'all' } = filters
+  const startOfToday = getStartOfToday()
+  const sevenDaysAgo = getDaysAgo(7)
+  const thirtyDaysAgo = getDaysAgo(30)
+
+  try {
+    // Get all loop events from the last 30 days
+    // Use ilike to match loop-related events more flexibly
+    let query = supabase
+      .from('analytics_events')
+      .select('event_name, created_at, user_id, properties')
+      .gte('created_at', thirtyDaysAgo)
+      .ilike('event_name', 'loop%')
+
+    if (platform && platform !== 'all') {
+      query = query.eq('platform', platform)
+    }
+
+    const { data, error } = await query
+
+    if (error) {
+      console.error('Error fetching loop metrics:', error)
+      throw error
+    }
+
+    // Initialize counts
+    const counts = {
+      views: { today: 0, week: 0, month: 0 },
+      likes: { today: 0, week: 0, month: 0 },
+      comments: { today: 0, week: 0, month: 0 },
+    }
+
+    const todayDate = new Date(startOfToday)
+    const weekDate = new Date(sevenDaysAgo)
+
+    // Track unique viewers and loops
+    const uniqueViewerIds = new Set<string>()
+    const uniqueLoopIds = new Set<string>()
+
+    // Count events by type and time period
+    data?.forEach(event => {
+      const eventDate = new Date(event.created_at)
+      const eventName = event.event_name?.toLowerCase() || ''
+      let category: 'views' | 'likes' | 'comments' | null = null
+
+      // Match loop view events
+      if (eventName.includes('loop') && (eventName.includes('view') || eventName.includes('watch') || eventName === 'loop_viewed')) {
+        category = 'views'
+        // Track unique viewers
+        if (event.user_id) {
+          uniqueViewerIds.add(event.user_id)
+        }
+        // Track unique loops from properties
+        const loopId = event.properties?.loop_id
+        if (loopId) {
+          uniqueLoopIds.add(loopId)
+        }
+      }
+      // Match loop like events
+      else if (eventName.includes('loop') && (eventName.includes('like') || eventName === 'loop_liked')) {
+        category = 'likes'
+      }
+      // Match loop comment events
+      else if (eventName.includes('loop') && (eventName.includes('comment') || eventName === 'loop_commented')) {
+        category = 'comments'
+      }
+
+      if (!category) return
+
+      // Month (all data is within month already)
+      counts[category].month++
+
+      // Week
+      if (eventDate >= weekDate) {
+        counts[category].week++
+      }
+
+      // Today
+      if (eventDate >= todayDate) {
+        counts[category].today++
+      }
+    })
+
+    const totalLoopsViewed = counts.views.month
+    const uniqueViewers = uniqueViewerIds.size
+    const uniqueLoops = uniqueLoopIds.size
+    const avgViewsPerLoop = uniqueLoops > 0 
+      ? Math.round((totalLoopsViewed / uniqueLoops) * 10) / 10 
+      : 0
+
+    return {
+      views: counts.views,
+      likes: counts.likes,
+      comments: counts.comments,
+      totalLoopsViewed,
+      uniqueViewers,
+      uniqueLoops,
+      avgViewsPerLoop,
+    }
+  } catch (error) {
+    console.error('Error fetching loop metrics:', error)
+    return {
+      views: { today: 0, week: 0, month: 0 },
+      likes: { today: 0, week: 0, month: 0 },
+      comments: { today: 0, week: 0, month: 0 },
+      totalLoopsViewed: 0,
+      uniqueViewers: 0,
+      uniqueLoops: 0,
+      avgViewsPerLoop: 0,
+    }
+  }
+}
+
 // ===== HELPERS =====
 
 function formatRelativeTime(dateString: string): string {
