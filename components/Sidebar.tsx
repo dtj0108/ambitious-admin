@@ -18,6 +18,7 @@ import {
   Zap,
   Shield,
   BarChart3,
+  Megaphone,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -40,6 +41,7 @@ const engagementNavigation = [
 const contentNavigation = [
   { name: 'Articles', href: '/articles', icon: Newspaper },
   { name: 'Spotlight', href: '/spotlight', icon: Sparkles },
+  { name: 'Ad Inventory', href: '/ad-inventory', icon: Megaphone },
 ]
 
 const systemNavigation = [
