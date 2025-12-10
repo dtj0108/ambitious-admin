@@ -30,11 +30,6 @@ import {
   Play,
 } from 'lucide-react'
 import {
-  getAnalyticsData,
-  getUniqueEventNames,
-  getKeyEventsMetrics,
-  getEngagementMetrics,
-  getLoopMetrics,
   type AnalyticsData,
   type AnalyticsFilters,
   type AnalyticsDateRange,
@@ -102,18 +97,26 @@ export default function AnalyticsPage() {
     try {
       setLoading(true)
       setError(null)
-      const [analyticsData, names, keyEventsData, engagementData, loopsData] = await Promise.all([
-        getAnalyticsData(filters),
-        getUniqueEventNames(),
-        getKeyEventsMetrics(filters),
-        getEngagementMetrics(filters),
-        getLoopMetrics(filters),
-      ])
-      setData(analyticsData)
-      setEventNames(names)
-      setKeyEvents(keyEventsData)
-      setEngagement(engagementData)
-      setLoops(loopsData)
+      
+      // Fetch from API route (uses service role key to bypass RLS)
+      const params = new URLSearchParams()
+      if (filters.dateRange) params.set('dateRange', filters.dateRange)
+      if (filters.platform) params.set('platform', filters.platform)
+      if (filters.eventType) params.set('eventType', filters.eventType)
+      
+      const response = await fetch(`/api/admin/analytics?${params.toString()}`)
+      
+      if (!response.ok) {
+        throw new Error('Failed to fetch analytics data')
+      }
+      
+      const result = await response.json()
+      
+      setData(result.data)
+      setEventNames(result.eventNames || [])
+      setKeyEvents(result.keyEvents)
+      setEngagement(result.engagement)
+      setLoops(result.loops)
     } catch (err) {
       console.error('Failed to fetch analytics data:', err)
       setError('Failed to load analytics data. Please check your connection.')

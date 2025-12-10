@@ -7,8 +7,8 @@ import {
   Filter, X, ChevronDown, ChevronUp, Calendar, Clock, User
 } from 'lucide-react'
 import { 
-  getNotificationStats, 
-  getNotifications, 
+  getNotificationStats,
+  getNotifications,
   getNotificationById,
   type NotificationStats, 
   type NotificationWithContext,
@@ -49,8 +49,8 @@ export default function NotificationsPage() {
   // Fetch stats
   useEffect(() => {
     async function fetchStats() {
-      const data = await getNotificationStats()
-      setStats(data)
+      const statsData = await getNotificationStats()
+      setStats(statsData)
     }
     fetchStats()
   }, [])
@@ -61,7 +61,7 @@ export default function NotificationsPage() {
     const result = await getNotifications({
       page,
       limit,
-      type: typeFilter,
+      type: typeFilter === 'all' ? undefined : typeFilter,
       readStatus,
       dateRange,
     })

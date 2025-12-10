@@ -70,7 +70,7 @@ export default function MeetPage() {
     const result = await getMeetRequests({
       page,
       limit,
-      status: statusFilter,
+      status: statusFilter === 'all' ? undefined : statusFilter,
       dateRange,
     })
     setRequests(result.requests)

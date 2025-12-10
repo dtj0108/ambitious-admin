@@ -19,6 +19,7 @@ import {
   Shield,
   BarChart3,
   Megaphone,
+  Bot,
 } from 'lucide-react'
 import { useState } from 'react'
 import { cn } from '@/lib/utils'
@@ -42,6 +43,10 @@ const contentNavigation = [
   { name: 'Articles', href: '/articles', icon: Newspaper },
   { name: 'Spotlight', href: '/spotlight', icon: Sparkles },
   { name: 'Ad Inventory', href: '/ad-inventory', icon: Megaphone },
+]
+
+const automationNavigation = [
+  { name: 'NPC Management', href: '/npc', icon: Bot },
 ]
 
 const systemNavigation = [
@@ -158,6 +163,7 @@ export function Sidebar() {
         <NavSection title="Overview" items={mainNavigation} collapsed={collapsed} pathname={pathname} />
         <NavSection title="Engagement" items={engagementNavigation} collapsed={collapsed} pathname={pathname} />
         <NavSection title="Content" items={contentNavigation} collapsed={collapsed} pathname={pathname} />
+        <NavSection title="Automation" items={automationNavigation} collapsed={collapsed} pathname={pathname} />
         
         <div className="flex-1" />
         
