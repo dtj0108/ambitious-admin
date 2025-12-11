@@ -339,6 +339,7 @@ Remember to respond with ONLY valid JSON.`
 
 /**
  * Build a complete image prompt with visual persona for Gemini
+ * Emphasizes dynamic scenes showing the character "living their life"
  */
 export function buildCompleteImagePrompt(
   generatedPrompt: ImagePromptResponse,
@@ -347,34 +348,38 @@ export function buildCompleteImagePrompt(
 ): string {
   const parts: string[] = []
 
-  // Style instruction
+  // Style instruction with emphasis on dynamic, natural moments
   if (preferredStyle === 'photo') {
-    parts.push('Create a photorealistic image with professional photography quality, natural lighting, and cinematic composition.')
+    parts.push('Create a photorealistic candid photograph - capture a natural, in-the-moment scene. Use professional photography quality with dynamic composition.')
   } else if (preferredStyle === 'illustration') {
-    parts.push('Create a digital illustration with clean lines, modern aesthetic, and professional quality.')
+    parts.push('Create a dynamic digital illustration showing the character in action, with expressive poses and engaging composition.')
   } else {
-    parts.push('Create a high-quality image, either photorealistic or illustrated, whichever suits the scene better.')
+    parts.push('Create a high-quality, dynamic image capturing a natural moment in this person\'s life.')
   }
 
+  parts.push('')
+  parts.push('KEY REQUIREMENT: Show this person actively engaged in the scene - NOT a static portrait or posed photo. They should be in motion, interacting with their environment, or caught in a candid moment.')
   parts.push('')
 
   // Character description if needed
   if (generatedPrompt.shouldIncludeCharacter && visualPersona) {
-    parts.push('THE PERSON IN THIS IMAGE:')
-    parts.push(`- ${visualPersona.appearance}`)
-    parts.push(`- Wearing: ${visualPersona.clothing}`)
-    parts.push(`- Style: ${visualPersona.style}`)
+    parts.push('THE PERSON (keep their identity but show them in a NEW situation):')
+    parts.push(`- Physical: ${visualPersona.appearance}`)
+    parts.push(`- Clothing style (adapt to scene): ${visualPersona.clothing}`)
+    parts.push(`- Their vibe: ${visualPersona.style}`)
     parts.push('')
   }
 
-  // Scene
-  parts.push('SCENE:')
+  // Scene - the main focus
+  parts.push('THE SCENE (create this as a new, unique moment):')
   parts.push(generatedPrompt.prompt)
+  parts.push('')
+  parts.push('Make it feel like a snapshot from their real life - natural, spontaneous, and full of personality.')
 
   // Environment hints
   if (visualPersona?.environment) {
     parts.push('')
-    parts.push(`Setting hints: ${visualPersona.environment}`)
+    parts.push(`Typical settings for this person: ${visualPersona.environment}`)
   }
 
   // Photography style

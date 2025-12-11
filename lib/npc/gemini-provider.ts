@@ -111,16 +111,35 @@ export class GeminiImageProvider {
   }
 
   /**
-   * Generate image with a reference image for better consistency
+   * Generate image with a reference image for facial consistency only
    */
   async generateImageWithReference(
     request: ImageGenerationRequest,
     referenceImageBase64: string,
     referenceMimeType: string = 'image/png'
   ): Promise<ImageGenerationResponse> {
-    const fullPrompt = this.buildPromptWithPersona(request)
+    // Build the scene prompt
+    const scenePrompt = this.buildPromptWithPersona(request)
+    
+    // Add face-only reference instructions
+    const fullPrompt = `REFERENCE IMAGE INSTRUCTIONS:
+The attached reference image shows a person. Use it ONLY for:
+- Facial features (face shape, eyes, nose, mouth, skin tone)
+- Hair color and general style
+- Overall identity/likeness
 
-    console.log('[GeminiImageProvider] Generating image with reference')
+DO NOT copy from the reference:
+- The pose or body position
+- The clothing or accessories
+- The background or setting
+- The lighting or composition
+- The facial expression (create a new one fitting the scene)
+
+CREATE A COMPLETELY NEW IMAGE showing this same person in the scene described below. They should be "living their life" - in motion, engaged in activities, in new environments.
+
+${scenePrompt}`
+
+    console.log('[GeminiImageProvider] Generating image with face-only reference')
 
     const response = await fetch(
       `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`,
