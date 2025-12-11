@@ -204,6 +204,12 @@ export async function POST(request: NextRequest) {
       custom_cron: body.custom_cron || null,
       engagement_settings: { ...defaultEngagementSettings, ...body.engagement_settings },
       is_active: body.is_active ?? true,
+      // Image generation settings
+      generate_images: body.generate_images ?? false,
+      image_frequency: body.image_frequency || 'sometimes',
+      preferred_image_style: body.preferred_image_style || 'photo',
+      visual_persona: body.visual_persona || null,
+      reference_image_url: body.reference_image_url || null,
     }
 
     const { data: npc, error: npcError } = await supabaseAdmin

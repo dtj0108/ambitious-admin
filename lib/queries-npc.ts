@@ -61,6 +61,17 @@ export interface EngagementSettings {
   engagement_style: EngagementStyle
 }
 
+export interface VisualPersona {
+  appearance: string // Physical appearance description
+  style: string // Overall aesthetic style
+  clothing: string // Typical clothing/fashion
+  environment: string // Common settings/backgrounds
+  photography_style: string // Photo style (candid, portrait, etc.)
+}
+
+export type ImageFrequency = 'always' | 'sometimes' | 'rarely'
+export type ImageStyle = 'photo' | 'illustration' | 'mixed'
+
 export interface NPCProfile {
   id: string
   user_id: string
@@ -85,6 +96,12 @@ export interface NPCProfile {
   total_comments_given: number
   created_at: string
   updated_at: string
+  // Image generation settings
+  visual_persona: VisualPersona | null
+  reference_image_url: string | null
+  generate_images: boolean
+  image_frequency: ImageFrequency
+  preferred_image_style: ImageStyle
   // Joined profile data
   profile?: {
     username: string
@@ -102,6 +119,7 @@ export interface NPCPostQueueItem {
   content: string
   post_type: PostType
   image_url: string | null
+  image_prompt: string | null
   scheduled_for: string
   status: QueueStatus
   published_post_id: string | null
@@ -161,6 +179,12 @@ export interface UpdateNPCData {
   custom_cron?: string
   engagement_settings?: Partial<EngagementSettings>
   is_active?: boolean
+  // Image generation settings
+  generate_images?: boolean
+  image_frequency?: ImageFrequency
+  preferred_image_style?: ImageStyle
+  visual_persona?: VisualPersona | null
+  reference_image_url?: string | null
 }
 
 export interface NPCListOptions {
@@ -637,7 +661,8 @@ export async function addToQueue(item: {
   scheduled_for: Date
   generation_prompt?: string
   ai_model_used?: string
-  image_url?: string
+  image_url?: string | null
+  image_prompt?: string | null
 }): Promise<NPCPostQueueItem | null> {
   const client = getClient()
   if (!client) return null

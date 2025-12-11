@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Bot, Zap, Brain, Plus, User, Upload, Tag, Search, ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
+import { X, Bot, Zap, Brain, Plus, User, Upload, Tag, Search, ChevronDown, ChevronRight, Sparkles, Image } from 'lucide-react'
 import { Button } from './Button'
 import type { 
   AIModel, 
@@ -13,6 +13,9 @@ import type {
   NPCProfile,
   ScheduleMode,
   ActiveHours,
+  VisualPersona,
+  ImageFrequency,
+  ImageStyle,
 } from '@/lib/queries-npc'
 import { PROFILE_TAG_CATEGORIES, searchTags } from '@/lib/profileTags'
 
@@ -52,6 +55,18 @@ const ENGAGEMENT_STYLE_OPTIONS: { value: EngagementStyle; label: string }[] = [
   { value: 'curious', label: 'Curious' },
   { value: 'enthusiastic', label: 'Enthusiastic' },
   { value: 'thoughtful', label: 'Thoughtful' },
+]
+
+const IMAGE_FREQUENCY_OPTIONS: { value: ImageFrequency; label: string; description: string }[] = [
+  { value: 'always', label: 'Always', description: '100% of posts will have images' },
+  { value: 'sometimes', label: 'Sometimes', description: '~50% of posts will have images' },
+  { value: 'rarely', label: 'Rarely', description: '~25% of posts will have images' },
+]
+
+const IMAGE_STYLE_OPTIONS: { value: ImageStyle; label: string }[] = [
+  { value: 'photo', label: 'Photorealistic' },
+  { value: 'illustration', label: 'Illustration' },
+  { value: 'mixed', label: 'Mixed' },
 ]
 
 export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreateModalProps) {
@@ -101,13 +116,26 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
   const [commentOnTypes, setCommentOnTypes] = useState<PostType[]>(['win', 'dream'])
   const [engagementStyle, setEngagementStyle] = useState<EngagementStyle>('supportive')
   
+  // Step 6: Image generation settings
+  const [generateImages, setGenerateImages] = useState(false)
+  const [imageFrequency, setImageFrequency] = useState<ImageFrequency>('sometimes')
+  const [preferredImageStyle, setPreferredImageStyle] = useState<ImageStyle>('photo')
+  const [visualPersona, setVisualPersona] = useState<VisualPersona>({
+    appearance: '',
+    style: '',
+    clothing: '',
+    environment: '',
+    photography_style: '',
+  })
+  const [referenceImageUrl, setReferenceImageUrl] = useState('')
+  
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usernameError, setUsernameError] = useState<string | null>(null)
   
   // Current step
   const [step, setStep] = useState(1)
-  const totalSteps = 5
+  const totalSteps = 6
 
   // Load edit data
   useEffect(() => {
@@ -141,6 +169,15 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
       setCommentsPerDay(editNPC.engagement_settings?.comments_per_day ?? 5)
       setCommentOnTypes(editNPC.engagement_settings?.comment_on_types || ['win', 'dream'])
       setEngagementStyle(editNPC.engagement_settings?.engagement_style || 'supportive')
+      
+      // Load image generation settings
+      setGenerateImages(editNPC.generate_images ?? false)
+      setImageFrequency(editNPC.image_frequency ?? 'sometimes')
+      setPreferredImageStyle(editNPC.preferred_image_style ?? 'photo')
+      if (editNPC.visual_persona) {
+        setVisualPersona(editNPC.visual_persona)
+      }
+      setReferenceImageUrl(editNPC.reference_image_url || '')
       
       // Load profile data for editing
       if (editNPC.profile) {
@@ -385,6 +422,10 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
         engagement_style: engagementStyle,
       }
 
+      // Build visual persona if any field is filled
+      const hasVisualPersona = Object.values(visualPersona).some(v => v.trim() !== '')
+      const finalVisualPersona = hasVisualPersona ? visualPersona : null
+
       if (isEditMode) {
         // Update existing NPC
         const payload = {
@@ -396,6 +437,12 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
           post_types: postTypes,
           posting_times: postingTimes,
           engagement_settings: engagementSettings,
+          // Image generation settings
+          generate_images: generateImages,
+          image_frequency: imageFrequency,
+          preferred_image_style: preferredImageStyle,
+          visual_persona: finalVisualPersona,
+          reference_image_url: referenceImageUrl || null,
           // Include profile updates
           profile: {
             full_name: displayName || null,
@@ -436,6 +483,12 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
           post_types: postTypes,
           posting_times: postingTimes,
           engagement_settings: engagementSettings,
+          // Image generation settings
+          generate_images: generateImages,
+          image_frequency: imageFrequency,
+          preferred_image_style: preferredImageStyle,
+          visual_persona: finalVisualPersona,
+          reference_image_url: referenceImageUrl || null,
         }
 
         const response = await fetch('/api/npc', {
@@ -493,6 +546,17 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
     setCommentsPerDay(5)
     setCommentOnTypes(['win', 'dream'])
     setEngagementStyle('supportive')
+    setGenerateImages(false)
+    setImageFrequency('sometimes')
+    setPreferredImageStyle('photo')
+    setVisualPersona({
+      appearance: '',
+      style: '',
+      clothing: '',
+      environment: '',
+      photography_style: '',
+    })
+    setReferenceImageUrl('')
     setError(null)
     setUsernameError(null)
     onClose()
@@ -1403,6 +1467,172 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 6: Image Generation */}
+          {step === 6 && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-text mb-2">Image Generation</h3>
+                <p className="text-sm text-text-secondary mb-6">
+                  Configure AI-generated images for this NPC's posts. Requires GEMINI_API_KEY.
+                </p>
+                
+                {/* Enable/Disable */}
+                <div className="mb-6 p-4 bg-elevated rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Image size={20} className="text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-text">Generate Images with Posts</p>
+                        <p className="text-xs text-text-secondary">AI will create images to accompany posts</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setGenerateImages(!generateImages)}
+                      className={`w-12 h-6 rounded-full transition-colors ${
+                        generateImages ? 'bg-primary' : 'bg-border'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        generateImages ? 'translate-x-6' : 'translate-x-0.5'
+                      }`} />
+                    </button>
+                  </div>
+                </div>
+
+                {generateImages && (
+                  <>
+                    {/* Image Frequency */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-text mb-3">
+                        Image Frequency
+                      </label>
+                      <div className="space-y-2">
+                        {IMAGE_FREQUENCY_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setImageFrequency(option.value)}
+                            className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
+                              imageFrequency === option.value
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                          >
+                            <p className="font-medium text-text">{option.label}</p>
+                            <p className="text-xs text-text-secondary">{option.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Image Style */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-text mb-3">
+                        Preferred Image Style
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {IMAGE_STYLE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setPreferredImageStyle(option.value)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                              preferredImageStyle === option.value
+                                ? 'bg-primary text-white'
+                                : 'bg-elevated text-text-secondary hover:bg-elevated/80'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Visual Persona */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-text mb-2">
+                        Visual Persona
+                      </label>
+                      <p className="text-xs text-text-secondary mb-4">
+                        Describe the character's visual appearance for consistent image generation.
+                      </p>
+                      
+                      <div className="space-y-4 p-4 bg-elevated rounded-xl">
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Appearance</label>
+                          <input
+                            type="text"
+                            placeholder="e.g., 30s professional woman, warm brown skin, short natural curly hair"
+                            value={visualPersona.appearance}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, appearance: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Style</label>
+                          <input
+                            type="text"
+                            placeholder="e.g., clean, modern, minimalist aesthetic"
+                            value={visualPersona.style}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, style: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Clothing</label>
+                          <input
+                            type="text"
+                            placeholder="e.g., usually wears blazers, neutral tones, subtle gold jewelry"
+                            value={visualPersona.clothing}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, clothing: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Environment</label>
+                          <input
+                            type="text"
+                            placeholder="e.g., modern office spaces, coffee shops, urban settings"
+                            value={visualPersona.environment}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, environment: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Photography Style</label>
+                          <input
+                            type="text"
+                            placeholder="e.g., candid, natural lighting, shallow depth of field"
+                            value={visualPersona.photography_style}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, photography_style: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Reference Image URL */}
+                    <div>
+                      <label className="block text-sm font-medium text-text mb-2">
+                        Reference Image URL (Optional)
+                      </label>
+                      <p className="text-xs text-text-secondary mb-2">
+                        Provide a reference image for better character consistency
+                      </p>
+                      <input
+                        type="url"
+                        placeholder="https://example.com/reference-image.jpg"
+                        value={referenceImageUrl}
+                        onChange={(e) => setReferenceImageUrl(e.target.value)}
+                        className="w-full h-10 px-3 bg-elevated border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                      />
+                    </div>
+                  </>
                 )}
               </div>
             </div>

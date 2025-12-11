@@ -1,17 +1,37 @@
 import { createAIProvider } from './ai-providers'
 import { addToQueue, getNPCById, getRecentNPCPosts } from '../queries-npc'
 import { calculateMultiplePostTimes, getPostsToGenerate } from './schedule-utils'
+import { generateImagePrompt, buildCompleteImagePrompt } from './image-prompt-generator'
+import { createGeminiImageProvider, isGeminiConfigured } from './gemini-provider'
+import { uploadNPCImage } from './image-storage'
 import type { 
   ContentGenerationOptions, 
   ScheduledPost, 
   GeneratePostRequest 
 } from './types'
-import type { NPCProfile, PostType, PostingTimes } from '../queries-npc'
+import type { NPCProfile, PostType, PostingTimes, ImageFrequency } from '../queries-npc'
 
 export class ContentGenerator {
   /**
    * Generate posts for an NPC and add them to the queue
    */
+  /**
+   * Determine if an image should be generated based on frequency setting
+   */
+  private static shouldGenerateImage(frequency: ImageFrequency): boolean {
+    const random = Math.random()
+    switch (frequency) {
+      case 'always':
+        return true
+      case 'sometimes':
+        return random < 0.5 // 50% chance
+      case 'rarely':
+        return random < 0.25 // 25% chance
+      default:
+        return false
+    }
+  }
+
   static async generatePosts(options: ContentGenerationOptions): Promise<ScheduledPost[]> {
     const {
       npcId,
@@ -26,6 +46,10 @@ export class ContentGenerator {
       temperature,
       postingTimes,
       count = 1,
+      generateImages = false,
+      imageFrequency = 'sometimes',
+      preferredImageStyle = 'photo',
+      visualPersona = null,
     } = options
 
     const provider = createAIProvider(aiModel, { temperature })
@@ -41,6 +65,12 @@ export class ContentGenerator {
     const scheduleTimes = postingTimes
       ? calculateMultiplePostTimes(postingTimes, count)
       : this.calculateLegacyScheduleTimes(count)
+
+    // Check if we can generate images
+    const canGenerateImages = generateImages && isGeminiConfigured()
+    if (generateImages && !isGeminiConfigured()) {
+      console.warn('[ContentGenerator] Image generation enabled but GEMINI_API_KEY not configured')
+    }
 
     for (let i = 0; i < count; i++) {
       // Pick a random post type from allowed types
@@ -62,12 +92,67 @@ export class ContentGenerator {
         // Use pre-calculated random schedule time
         const scheduledFor = scheduleTimes[i]
 
+        let imageUrl: string | null = null
+        let imagePrompt: string | null = null
+
+        // Generate image if enabled and random check passes
+        if (canGenerateImages && this.shouldGenerateImage(imageFrequency)) {
+          try {
+            console.log(`[ContentGenerator] Generating image for post ${i + 1}`)
+            
+            // Step 1: Generate image prompt from text AI
+            const promptResult = await generateImagePrompt({
+              postContent: response.content,
+              postType: response.postType,
+              personaName,
+              tone,
+              visualPersona,
+              preferredStyle: preferredImageStyle,
+              aiModel,
+              temperature,
+            })
+
+            // Step 2: Build complete prompt with visual persona
+            const completePrompt = buildCompleteImagePrompt(
+              promptResult,
+              visualPersona,
+              preferredImageStyle
+            )
+            imagePrompt = completePrompt
+
+            // Step 3: Generate image with Gemini
+            const gemini = createGeminiImageProvider()
+            const imageResult = await gemini.generateImage({
+              prompt: completePrompt,
+              visualPersona,
+              style: preferredImageStyle,
+            })
+
+            // Step 4: Upload to storage
+            const uploadResult = await uploadNPCImage(
+              imageResult.imageData,
+              imageResult.mimeType,
+              npcId
+            )
+
+            if (uploadResult) {
+              imageUrl = uploadResult.url
+              console.log(`[ContentGenerator] Image uploaded: ${imageUrl}`)
+            }
+          } catch (imageError) {
+            console.error(`[ContentGenerator] Error generating image:`, imageError)
+            // Continue without image
+          }
+        }
+
         const post: ScheduledPost = {
           content: response.content,
           postType: response.postType,
           scheduledFor,
           generationPrompt: JSON.stringify(request),
           aiModelUsed: aiModel,
+          imageUrl,
+          imagePrompt,
         }
 
         generatedPosts.push(post)
@@ -81,6 +166,8 @@ export class ContentGenerator {
           scheduled_for: post.scheduledFor,
           generation_prompt: post.generationPrompt,
           ai_model_used: post.aiModelUsed,
+          image_url: post.imageUrl,
+          image_prompt: post.imagePrompt,
         })
 
         // Small delay to avoid rate limits
@@ -137,6 +224,11 @@ export class ContentGenerator {
       temperature: npc.temperature, // AI creativity setting
       postingTimes: npc.posting_times, // Pass schedule configuration
       count,
+      // Image generation settings
+      generateImages: npc.generate_images,
+      imageFrequency: npc.image_frequency,
+      preferredImageStyle: npc.preferred_image_style,
+      visualPersona: npc.visual_persona,
     })
   }
 

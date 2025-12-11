@@ -1,7 +1,7 @@
-import type { PostType, Tone, EngagementStyle, ScheduleMode, PostingTimes, ActiveHours } from '../queries-npc'
+import type { PostType, Tone, EngagementStyle, ScheduleMode, PostingTimes, ActiveHours, VisualPersona, ImageFrequency, ImageStyle } from '../queries-npc'
 
 // Re-export schedule types
-export type { ScheduleMode, PostingTimes, ActiveHours }
+export type { ScheduleMode, PostingTimes, ActiveHours, VisualPersona, ImageFrequency, ImageStyle }
 
 // =====================================================
 // AI Provider Types
@@ -69,6 +69,11 @@ export interface ContentGenerationOptions {
   temperature?: number // AI creativity (0.0-1.0), defaults to 0.8
   postingTimes?: PostingTimes // Schedule configuration
   count?: number // Number of posts to generate
+  // Image generation options
+  generateImages?: boolean
+  imageFrequency?: ImageFrequency
+  preferredImageStyle?: ImageStyle
+  visualPersona?: VisualPersona | null
 }
 
 export interface ScheduledPost {
@@ -77,6 +82,8 @@ export interface ScheduledPost {
   scheduledFor: Date
   generationPrompt: string
   aiModelUsed: string
+  imageUrl?: string | null
+  imagePrompt?: string | null
 }
 
 // =====================================================
