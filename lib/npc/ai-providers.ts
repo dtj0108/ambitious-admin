@@ -418,7 +418,7 @@ export class XAIProvider implements AIProvider {
 
   constructor(config: AIProviderConfig) {
     this.apiKey = config.apiKey
-    this.model = config.model || 'grok-3-latest'
+    this.model = config.model || 'grok-4-1-fast-non-reasoning'
     this.maxTokens = config.maxTokens || 500
     this.temperature = config.temperature || 0.8
   }

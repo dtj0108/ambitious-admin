@@ -1,5 +1,5 @@
 import { createAIProvider } from './ai-providers'
-import { addToQueue, getNPCById } from '../queries-npc'
+import { addToQueue, getNPCById, getRecentNPCPosts } from '../queries-npc'
 import { calculateMultiplePostTimes, getPostsToGenerate } from './schedule-utils'
 import type { 
   ContentGenerationOptions, 
@@ -30,7 +30,12 @@ export class ContentGenerator {
 
     const provider = createAIProvider(aiModel, { temperature })
     const generatedPosts: ScheduledPost[] = []
-    const previousContents: string[] = []
+    
+    // Fetch recent posts from the database to avoid repetition across sessions
+    const historicalPosts = await getRecentNPCPosts(npcId, 15)
+    const previousContents: string[] = [...historicalPosts]
+    
+    console.log(`[ContentGenerator] Loaded ${historicalPosts.length} historical posts for context`)
 
     // Calculate random schedule times based on posting configuration
     const scheduleTimes = postingTimes

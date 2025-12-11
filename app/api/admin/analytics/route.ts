@@ -107,7 +107,11 @@ export async function GET(request: Request) {
     })
 
     const trend = Object.entries(eventsByDate)
-      .map(([date, count]) => ({ date, count }))
+      .map(([date, count]) => {
+        const dateObj = new Date(date + 'T00:00:00')
+        const label = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        return { date, label, count }
+      })
       .sort((a, b) => a.date.localeCompare(b.date))
 
     // ===== TOP EVENTS =====
@@ -122,39 +126,59 @@ export async function GET(request: Request) {
       eventCounts[e.event_name] = (eventCounts[e.event_name] || 0) + 1
     })
 
+    const totalEventCount = Object.values(eventCounts).reduce((sum, c) => sum + c, 0)
     const topEvents = Object.entries(eventCounts)
-      .map(([name, count]) => ({ name, count }))
+      .map(([eventName, count]) => ({ 
+        eventName, 
+        count, 
+        percentage: totalEventCount > 0 ? Math.round((count / totalEventCount) * 100) : 0 
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
 
     // ===== PLATFORM BREAKDOWN (as array) =====
+    const platformColors: Record<string, string> = {
+      web: '#4A9EFF',
+      ios: '#FF6B6B',
+      android: '#4ECB71',
+      unknown: '#888888',
+    }
     const platformBreakdown = Object.entries(platformBreakdownMap).map(([platform, count]) => ({
       platform,
       count,
       percentage: totalEvents > 0 ? Math.round((count / totalEvents) * 100) : 0,
+      color: platformColors[platform.toLowerCase()] || platformColors.unknown,
     }))
 
     // ===== RETENTION (simplified) =====
+    // Calculate DAU/WAU/MAU from unique users in different time periods
+    const dau = uniqueUsers // Users active in the selected period (approximation)
+    const wau = uniqueUsers
+    const mau = uniqueUsers
+    const dauWauRatio = wau > 0 ? Math.round((dau / wau) * 100) : 0
+    const dauMauRatio = mau > 0 ? Math.round((dau / mau) * 100) : 0
+    
     const retention = {
-      day1: 0,
-      day7: 0,
-      day30: 0,
-      cohorts: [] as Array<{ date: string; day1: number; day7: number; day30: number }>,
+      dau,
+      wau,
+      mau,
+      dauWauRatio,
+      dauMauRatio,
     }
 
     // ===== FUNNEL (simplified) =====
     const funnel = [
-      { step: 'Visit', count: uniqueSessions, percentage: 100 },
-      { step: 'Signup', count: 0, percentage: 0 },
-      { step: 'First Post', count: 0, percentage: 0 },
-      { step: 'First Follow', count: 0, percentage: 0 },
+      { name: 'Visit', eventName: 'session_start', count: uniqueSessions, conversionRate: 100, dropOffRate: 0 },
+      { name: 'Signup', eventName: 'signup', count: 0, conversionRate: 0, dropOffRate: 100 },
+      { name: 'First Post', eventName: 'post_created', count: 0, conversionRate: 0, dropOffRate: 0 },
+      { name: 'First Follow', eventName: 'follow', count: 0, conversionRate: 0, dropOffRate: 0 },
     ]
 
     // ===== SESSION INSIGHTS (simplified) =====
     const sessionInsights = {
       avgEventsPerSession,
       avgSessionDurationMinutes: 0,
-      topPages: [] as Array<{ page: string; views: number }>,
+      topPages: [] as Array<{ url: string; count: number }>,
       bounceRate: 0,
     }
 
@@ -258,7 +282,7 @@ export async function GET(request: Request) {
     }
 
     // ===== LOOP METRICS =====
-    let loopQuery = supabaseAdmin.from('analytics_events').select('event_name, created_at')
+    let loopQuery = supabaseAdmin.from('analytics_events').select('event_name, created_at, user_id, properties')
       .gte('created_at', monthStartDate.toISOString())
       .ilike('event_name', 'loop%')
 
@@ -266,19 +290,28 @@ export async function GET(request: Request) {
 
     const loopCounts = {
       views: { today: 0, week: 0, month: 0 },
-      plays: { today: 0, week: 0, month: 0 },
-      completions: { today: 0, week: 0, month: 0 },
-      shares: { today: 0, week: 0, month: 0 },
+      likes: { today: 0, week: 0, month: 0 },
+      comments: { today: 0, week: 0, month: 0 },
     }
+
+    const uniqueViewerIds = new Set<string>()
+    const uniqueLoopIds = new Set<string>()
+    let totalLoopsViewed = 0
 
     loopData?.forEach(e => {
       const eventDate = new Date(e.created_at)
       let category: keyof typeof loopCounts | null = null
       
-      if (e.event_name.includes('view')) category = 'views'
-      else if (e.event_name.includes('play')) category = 'plays'
-      else if (e.event_name.includes('complete')) category = 'completions'
-      else if (e.event_name.includes('share')) category = 'shares'
+      if (e.event_name.includes('view')) {
+        category = 'views'
+        totalLoopsViewed++
+        if (e.user_id) uniqueViewerIds.add(e.user_id)
+        // Try to extract loop_id from properties if available
+        const props = e.properties as Record<string, unknown> | null
+        if (props?.loop_id) uniqueLoopIds.add(String(props.loop_id))
+      }
+      else if (e.event_name.includes('like')) category = 'likes'
+      else if (e.event_name.includes('comment')) category = 'comments'
 
       if (category) {
         if (eventDate >= todayStartDate) loopCounts[category].today++
@@ -286,6 +319,20 @@ export async function GET(request: Request) {
         loopCounts[category].month++
       }
     })
+
+    const uniqueViewers = uniqueViewerIds.size
+    const uniqueLoops = uniqueLoopIds.size
+    const avgViewsPerLoop = uniqueLoops > 0 ? Math.round((totalLoopsViewed / uniqueLoops) * 10) / 10 : 0
+
+    const loops = {
+      views: loopCounts.views,
+      likes: loopCounts.likes,
+      comments: loopCounts.comments,
+      totalLoopsViewed,
+      uniqueViewers,
+      uniqueLoops,
+      avgViewsPerLoop,
+    }
 
     return NextResponse.json({
       data: {
@@ -300,7 +347,7 @@ export async function GET(request: Request) {
       eventNames,
       keyEvents,
       engagement,
-      loops: loopCounts,
+      loops,
     })
   } catch (error) {
     console.error('Error in analytics API:', error)

@@ -605,6 +605,31 @@ export async function getPendingQueueItems(beforeTime?: Date): Promise<NPCPostQu
   return data as NPCPostQueueItem[]
 }
 
+/**
+ * Get recent posts for an NPC to use as context for new content generation.
+ * This helps the AI avoid repeating themes, topics, and opening structures.
+ */
+export async function getRecentNPCPosts(npcId: string, limit: number = 15): Promise<string[]> {
+  const client = getClient()
+  if (!client) return []
+
+  const { data, error } = await client
+    .from('npc_post_queue')
+    .select('content')
+    .eq('npc_id', npcId)
+    .in('status', ['pending', 'published'])
+    .order('created_at', { ascending: false })
+    .limit(limit)
+
+  if (error) {
+    console.error('Error fetching recent NPC posts:', error)
+    return []
+  }
+
+  // Return just the content strings for context
+  return (data || []).map((item: { content: string }) => item.content)
+}
+
 export async function addToQueue(item: {
   npc_id: string
   content: string

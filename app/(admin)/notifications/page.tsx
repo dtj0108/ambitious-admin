@@ -7,9 +7,6 @@ import {
   Filter, X, ChevronDown, ChevronUp, Calendar, Clock, User
 } from 'lucide-react'
 import { 
-  getNotificationStats,
-  getNotifications,
-  getNotificationById,
   type NotificationStats, 
   type NotificationWithContext,
   type NotificationType,
@@ -46,28 +43,31 @@ export default function NotificationsPage() {
   const [selectedNotification, setSelectedNotification] = useState<NotificationWithContext | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
-  // Fetch stats
-  useEffect(() => {
-    async function fetchStats() {
-      const statsData = await getNotificationStats()
-      setStats(statsData)
-    }
-    fetchStats()
-  }, [])
+  // Fetch stats (stats are included in the notifications API response)
+  // Stats will be set when fetching notifications
 
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
     setLoading(true)
-    const result = await getNotifications({
-      page,
-      limit,
-      type: typeFilter === 'all' ? undefined : typeFilter,
-      readStatus,
-      dateRange,
-    })
-    setNotifications(result.notifications)
-    setTotalPages(result.totalPages)
-    setTotal(result.total)
+    try {
+      const params = new URLSearchParams()
+      params.set('page', page.toString())
+      params.set('limit', limit.toString())
+      if (typeFilter !== 'all') params.set('type', typeFilter)
+      params.set('readStatus', readStatus)
+      params.set('dateRange', dateRange)
+      
+      const response = await fetch(`/api/admin/notifications?${params.toString()}`)
+      if (response.ok) {
+        const result = await response.json()
+        setStats(result.stats)
+        setNotifications(result.notifications)
+        setTotalPages(result.totalPages)
+        setTotal(result.total)
+      }
+    } catch (error) {
+      console.error('Failed to fetch notifications:', error)
+    }
     setLoading(false)
   }, [page, limit, typeFilter, readStatus, dateRange])
 
@@ -82,11 +82,9 @@ export default function NotificationsPage() {
 
   // Open modal
   const handleViewNotification = async (notification: NotificationWithContext) => {
-    const fullNotification = await getNotificationById(notification.id)
-    if (fullNotification) {
-      setSelectedNotification(fullNotification)
-      setModalOpen(true)
-    }
+    // Use the notification data we already have since full data is included in list
+    setSelectedNotification(notification)
+    setModalOpen(true)
   }
 
   // Clear filters

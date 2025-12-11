@@ -16,8 +16,6 @@ import {
   Lock,
 } from 'lucide-react'
 import { 
-  getMessageStats, 
-  getMessageActivityTrend,
   type MessageStats,
   type MessageActivityPoint,
 } from '@/lib/queries'
@@ -29,12 +27,16 @@ export default function MessagesPage() {
 
   const fetchData = async () => {
     setLoading(true)
-    const [statsData, trendData] = await Promise.all([
-      getMessageStats(),
-      getMessageActivityTrend(7),
-    ])
-    setStats(statsData)
-    setTrend(trendData)
+    try {
+      const response = await fetch('/api/admin/messages')
+      if (response.ok) {
+        const data = await response.json()
+        setStats(data.stats)
+        setTrend(data.trend)
+      }
+    } catch (error) {
+      console.error('Failed to fetch messages data:', error)
+    }
     setLoading(false)
   }
 
