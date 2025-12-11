@@ -7,7 +7,7 @@ export { ContentGenerator } from './content-generator'
 export { BehaviorEngine } from './behavior-engine'
 
 // Image generation exports
-export { GeminiImageProvider, createGeminiImageProvider, isGeminiConfigured } from './gemini-provider'
+export { GeminiImageProvider, createGeminiImageProvider, isGeminiConfigured, fetchImageAsBase64 } from './gemini-provider'
 export { generateImagePrompt, buildCompleteImagePrompt, generateVisualPersonaFromText, buildReferenceImagePrompt, generateCompleteNPC } from './image-prompt-generator'
 export type { GeneratedNPCData, GenerateCompleteNPCRequest } from './image-prompt-generator'
 export { uploadNPCImage, deleteNPCImage } from './image-storage'

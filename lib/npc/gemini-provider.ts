@@ -191,3 +191,28 @@ export function isGeminiConfigured(): boolean {
   return Boolean(process.env.GEMINI_API_KEY)
 }
 
+/**
+ * Fetch an image from URL and convert to base64
+ */
+export async function fetchImageAsBase64(url: string): Promise<{ data: string; mimeType: string } | null> {
+  try {
+    const response = await fetch(url)
+    if (!response.ok) {
+      console.warn(`[fetchImageAsBase64] Failed to fetch image: ${response.status}`)
+      return null
+    }
+
+    const contentType = response.headers.get('content-type') || 'image/png'
+    const arrayBuffer = await response.arrayBuffer()
+    const base64 = Buffer.from(arrayBuffer).toString('base64')
+
+    return {
+      data: base64,
+      mimeType: contentType,
+    }
+  } catch (error) {
+    console.error('[fetchImageAsBase64] Error:', error)
+    return null
+  }
+}
+

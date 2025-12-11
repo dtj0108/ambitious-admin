@@ -74,6 +74,7 @@ export interface ContentGenerationOptions {
   imageFrequency?: ImageFrequency
   preferredImageStyle?: ImageStyle
   visualPersona?: VisualPersona | null
+  referenceImageUrl?: string | null // Reference image for character consistency (defaults to avatar)
 }
 
 export interface ScheduledPost {

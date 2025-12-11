@@ -2,7 +2,7 @@ import { createAIProvider } from './ai-providers'
 import { addToQueue, getNPCById, getRecentNPCPosts } from '../queries-npc'
 import { calculateMultiplePostTimes, getPostsToGenerate } from './schedule-utils'
 import { generateImagePrompt, buildCompleteImagePrompt } from './image-prompt-generator'
-import { createGeminiImageProvider, isGeminiConfigured } from './gemini-provider'
+import { createGeminiImageProvider, isGeminiConfigured, fetchImageAsBase64 } from './gemini-provider'
 import { uploadNPCImage } from './image-storage'
 import type { 
   ContentGenerationOptions, 
@@ -50,6 +50,7 @@ export class ContentGenerator {
       imageFrequency = 'sometimes',
       preferredImageStyle = 'photo',
       visualPersona = null,
+      referenceImageUrl = null,
     } = options
 
     const provider = createAIProvider(aiModel, { temperature })
@@ -60,6 +61,16 @@ export class ContentGenerator {
     const previousContents: string[] = [...historicalPosts]
     
     console.log(`[ContentGenerator] Loaded ${historicalPosts.length} historical posts for context`)
+    
+    // Pre-fetch reference image for character consistency (if available)
+    let referenceImageData: { data: string; mimeType: string } | null = null
+    if (referenceImageUrl && generateImages) {
+      console.log(`[ContentGenerator] Fetching reference image for consistency: ${referenceImageUrl}`)
+      referenceImageData = await fetchImageAsBase64(referenceImageUrl)
+      if (referenceImageData) {
+        console.log('[ContentGenerator] Reference image loaded successfully')
+      }
+    }
 
     // Calculate random schedule times based on posting configuration
     const scheduleTimes = postingTimes
@@ -122,11 +133,27 @@ export class ContentGenerator {
 
             // Step 3: Generate image with Gemini
             const gemini = createGeminiImageProvider()
-            const imageResult = await gemini.generateImage({
-              prompt: completePrompt,
-              visualPersona,
-              style: preferredImageStyle,
-            })
+            let imageResult
+            
+            // Use reference image for character consistency if available
+            if (referenceImageData) {
+              console.log('[ContentGenerator] Using reference image for character consistency')
+              imageResult = await gemini.generateImageWithReference(
+                {
+                  prompt: completePrompt,
+                  visualPersona,
+                  style: preferredImageStyle,
+                },
+                referenceImageData.data,
+                referenceImageData.mimeType
+              )
+            } else {
+              imageResult = await gemini.generateImage({
+                prompt: completePrompt,
+                visualPersona,
+                style: preferredImageStyle,
+              })
+            }
 
             // Step 4: Upload to storage
             const uploadResult = await uploadNPCImage(
@@ -229,6 +256,8 @@ export class ContentGenerator {
       imageFrequency: npc.image_frequency,
       preferredImageStyle: npc.preferred_image_style,
       visualPersona: npc.visual_persona,
+      // Use reference_image_url if set, otherwise fall back to avatar for character consistency
+      referenceImageUrl: npc.reference_image_url || npc.profile?.avatar_url || null,
     })
   }
 
