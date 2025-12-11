@@ -74,12 +74,13 @@ Post types:
    - Mood: not always the same energy
    - Structure: questions, observations, stories, hot takes
 
-9. LENGTH VARIATION (CRITICAL)
+9. LENGTH VARIATION (CRITICAL - MAX 120 WORDS)
    - Before writing, silently pick ONE length bucket (do NOT announce it):
      - ONE-LINER: 5–20 words, 1 sentence
      - SHORT: 20–45 words, 1–2 sentences
-     - MEDIUM: 45–90 words, 2–5 sentences
-     - LONG: 90–160 words, 4–10 sentences (you may use 1 line break if it feels natural)
+     - MEDIUM: 45–80 words, 2–4 sentences
+     - LONG: 80–120 words, 4–6 sentences (you may use 1 line break if it feels natural)
+   - ABSOLUTE MAXIMUM: 120 words. NEVER exceed this limit under any circumstances.
    - If you're unsure which to choose, prefer the extremes: ONE-LINER or LONG.
    - Don't drift into the default 2–3 sentence “safe” post every time.
    - If you notice you're about to write ~2–3 sentences again, STOP and pick a different bucket.
