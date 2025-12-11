@@ -137,6 +137,12 @@ DO NOT copy from the reference:
 
 CREATE A COMPLETELY NEW IMAGE showing this same person in the scene described below. They should be "living their life" - in motion, engaged in activities, in new environments.
 
+REALISM REQUIREMENTS (CRITICAL):
+- Realistic physics: feet on the ground, proper weight distribution, no floating
+- Anatomically correct: proper proportions, natural joint positions, realistic hands
+- Grounded in reality: believable scene, natural lighting, coherent environment
+- No surreal or impossible poses
+
 ${scenePrompt}`
 
     console.log('[GeminiImageProvider] Generating image with face-only reference')

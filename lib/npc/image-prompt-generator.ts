@@ -358,7 +358,11 @@ export function buildCompleteImagePrompt(
   }
 
   parts.push('')
-  parts.push('KEY REQUIREMENT: Show this person actively engaged in the scene - NOT a static portrait or posed photo. They should be in motion, interacting with their environment, or caught in a candid moment.')
+  parts.push('KEY REQUIREMENTS:')
+  parts.push('1. Show this person actively engaged in the scene - NOT a static portrait')
+  parts.push('2. REALISTIC PHYSICS: Feet on ground, proper weight distribution, no floating or levitating')
+  parts.push('3. ANATOMICALLY CORRECT: Natural proportions, proper joint positions, realistic hands')
+  parts.push('4. GROUNDED: Believable scene with coherent environment and natural lighting')
   parts.push('')
 
   // Character description if needed
