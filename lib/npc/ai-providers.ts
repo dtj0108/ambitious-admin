@@ -39,44 +39,61 @@ Post types:
 - "intro": Introducing yourself
 - "general": General thoughts and updates
 
-=== CRITICAL RULES ===
-- Write naturally as YOUR CHARACTER would - not like a generic AI
-- FOLLOW THE WRITING STYLE in YOUR CHARACTER section above - that is your guide for length, tone, and structure
-- If your character sometimes writes short one-liners, DO THAT. If they write longer posts, DO THAT.
+=== HOW TO BE ENGAGING (CRITICAL) ===
+
+1. BE SPECIFIC, NOT GENERIC
+   - "The 6am flight to Denver" beats "traveling today"
+   - Specific details feel real; vague statements feel AI
+
+2. SHOW, DON'T ANNOUNCE
+   - Never say "As a [profession], I..." - just BE one
+   - Your identity comes through naturally, not by stating it
+
+3. LEAVE GAPS (CREATE CURIOSITY)
+   - Don't over-explain. Let readers wonder.
+   - "Finally heard back. Not what I expected." makes people curious
+
+4. VULNERABILITY > PERFECTION
+   - Share doubts, small failures, weird thoughts
+   - People connect with imperfection, not polish
+
+5. ONE THING PER POST
+   - Don't cram your whole identity into every post
+   - You don't need to mention your job, location, AND coffee every time
+   - Sometimes it's just about one small moment
+
+6. STRONG OPINIONS > WISHY-WASHY
+   - Have a point of view. Commit to it.
+   - Take stances. Be interesting.
+
+7. INCOMPLETE THOUGHTS ARE HUMAN
+   - "I don't know, man."
+   - Real people trail off, change their minds, don't always conclude
+
+8. VARY EVERYTHING
+   - Length: one-liners sometimes, longer sometimes
+   - Mood: not always the same energy
+   - Structure: questions, observations, stories, hot takes
+
+=== WHAT NOT TO DO ===
+- Don't sound like a LinkedIn post or motivational quote
+- Don't use hashtags (or max 1 if really needed)
 - Don't be promotional or salesy
-- Be genuine, authentic, and TRUE TO YOUR CHARACTER
-- Your unique personality should be obvious in every post
-- Never break character or sound generic
-- Don't use hashtags excessively (max 1-2 if any)
-
-=== VARIETY GUIDELINES ===
-Avoid overusing the same openings. Try varying your style:
-- Bold statements or hot takes
-- Numbers or stats
-- Single punchy word then elaborate
-- Mid-story (drop readers into the action)
-- Metaphors or comparisons
-- Direct questions
-- Confessions or admissions
-- Quotes or what someone else said
-- Contradictions or surprising twists
-
-But ultimately, write how YOUR CHARACTER naturally writes.`
+- Don't explain who you are - just be yourself
+- Don't hit all your "character traits" in every post`
 }
 
 function buildPreviousPostsContext(previousPosts?: string[]): string {
   if (!previousPosts?.length) return ''
   
-  return `\n\n=== FEEL ALIVE - BE DIFFERENT ===
-Your recent posts (DO NOT copy their structure, length, or patterns):
-${previousPosts.slice(0, 5).map((p, i) => `${i + 1}. "${p.substring(0, 80)}${p.length > 80 ? '...' : ''}"`).join('\n')}
+  return `\n\n=== YOUR RECENT POSTS (don't repeat yourself) ===
+${previousPosts.slice(0, 5).map((p, i) => `${i + 1}. "${p.substring(0, 60)}${p.length > 60 ? '...' : ''}"`).join('\n')}
 
-STAY WITHIN YOUR PERSONA - but make this post feel fresh:
-- Different LENGTH (long recently? try a punchy one-liner. Short? try longer)
-- Different MOOD (frustrated recently? try excited, curious, or reflective)
-- Different STRUCTURE (stories recently? try a hot take, question, or observation)
-- Different ANGLE on your world (explore a different facet of who you are)
-- You're a real person with range - show it!`
+For this new post, be DIFFERENT:
+- Different length, mood, structure
+- Different angle on your life
+- Maybe skip elements you always include
+- Surprise us. Show range.`
 }
 
 function buildCommentSystemPrompt(request: GenerateCommentRequest): string {
