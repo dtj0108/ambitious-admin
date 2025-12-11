@@ -788,6 +788,20 @@ export function NPCDetailModal({ npcId, isOpen, onClose, onUpdated }: NPCDetailM
                                   </span>
                                 </div>
                                 <p className="text-sm text-text line-clamp-2">{item.content}</p>
+                                
+                                {/* Image Preview */}
+                                {item.image_url && (
+                                  <div className="mt-3">
+                                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-surface">
+                                      <img 
+                                        src={item.image_url} 
+                                        alt="Post image" 
+                                        className="w-full h-full object-cover"
+                                      />
+                                    </div>
+                                  </div>
+                                )}
+                                
                                 <div className="flex items-center gap-4 mt-2 text-xs text-text-tertiary">
                                   <span className="flex items-center gap-1">
                                     <Calendar size={12} />
@@ -796,6 +810,12 @@ export function NPCDetailModal({ npcId, isOpen, onClose, onUpdated }: NPCDetailM
                                   {item.status === 'pending' && (
                                     <span className="text-post-win">
                                       {formatRelativeTime(item.scheduled_for)}
+                                    </span>
+                                  )}
+                                  {item.image_url && (
+                                    <span className="flex items-center gap-1 text-primary">
+                                      <span className="w-1.5 h-1.5 rounded-full bg-primary" />
+                                      Has image
                                     </span>
                                   )}
                                 </div>

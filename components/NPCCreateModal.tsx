@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Bot, Zap, Brain, Plus, User, Upload, Tag, Search, ChevronDown, ChevronRight, Sparkles } from 'lucide-react'
+import { X, Bot, Zap, Brain, Plus, User, Upload, Tag, Search, ChevronDown, ChevronRight, Sparkles, Image, Wand2, RefreshCw } from 'lucide-react'
 import { Button } from './Button'
 import type { 
   AIModel, 
@@ -13,6 +13,10 @@ import type {
   NPCProfile,
   ScheduleMode,
   ActiveHours,
+  VisualPersona,
+  ImageFrequency,
+  ImageStyle,
+  NpcType,
 } from '@/lib/queries-npc'
 import { PROFILE_TAG_CATEGORIES, searchTags } from '@/lib/profileTags'
 
@@ -54,6 +58,18 @@ const ENGAGEMENT_STYLE_OPTIONS: { value: EngagementStyle; label: string }[] = [
   { value: 'thoughtful', label: 'Thoughtful' },
 ]
 
+const IMAGE_FREQUENCY_OPTIONS: { value: ImageFrequency; label: string; description: string }[] = [
+  { value: 'always', label: 'Always', description: '100% of posts will have images' },
+  { value: 'sometimes', label: 'Sometimes', description: '~50% of posts will have images' },
+  { value: 'rarely', label: 'Rarely', description: '~25% of posts will have images' },
+]
+
+const IMAGE_STYLE_OPTIONS: { value: ImageStyle; label: string }[] = [
+  { value: 'photo', label: 'Photorealistic' },
+  { value: 'illustration', label: 'Illustration' },
+  { value: 'mixed', label: 'Mixed' },
+]
+
 export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreateModalProps) {
   const isEditMode = Boolean(editNPC)
   
@@ -77,6 +93,7 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
   const [temperature, setTemperature] = useState(0.8) // AI creativity (0.0-1.0)
   const [personaName, setPersonaName] = useState('')
   const [personaPrompt, setPersonaPrompt] = useState('')
+  const [npcType, setNpcType] = useState<NpcType>('person')
   
   // Step 3: Content Config
   const [tone, setTone] = useState<Tone>('casual')
@@ -101,13 +118,32 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
   const [commentOnTypes, setCommentOnTypes] = useState<PostType[]>(['win', 'dream'])
   const [engagementStyle, setEngagementStyle] = useState<EngagementStyle>('supportive')
   
+  // Step 6: Image generation settings
+  const [generateImages, setGenerateImages] = useState(false)
+  const [imageFrequency, setImageFrequency] = useState<ImageFrequency>('sometimes')
+  const [preferredImageStyle, setPreferredImageStyle] = useState<ImageStyle>('photo')
+  const [visualPersona, setVisualPersona] = useState<VisualPersona>({
+    appearance: '',
+    style: '',
+    clothing: '',
+    environment: '',
+    photography_style: '',
+  })
+  const [referenceImageUrl, setReferenceImageUrl] = useState('')
+  const [generatingVisualPersona, setGeneratingVisualPersona] = useState(false)
+  const [generatingReferenceImage, setGeneratingReferenceImage] = useState(false)
+  
+  // Quick create with AI
+  const [quickCreateDescription, setQuickCreateDescription] = useState('')
+  const [generatingNPC, setGeneratingNPC] = useState(false)
+  
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usernameError, setUsernameError] = useState<string | null>(null)
   
   // Current step
   const [step, setStep] = useState(1)
-  const totalSteps = 5
+  const totalSteps = 6
 
   // Load edit data
   useEffect(() => {
@@ -141,6 +177,18 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
       setCommentsPerDay(editNPC.engagement_settings?.comments_per_day ?? 5)
       setCommentOnTypes(editNPC.engagement_settings?.comment_on_types || ['win', 'dream'])
       setEngagementStyle(editNPC.engagement_settings?.engagement_style || 'supportive')
+      
+      // Load NPC type
+      setNpcType(editNPC.npc_type ?? 'person')
+      
+      // Load image generation settings
+      setGenerateImages(editNPC.generate_images ?? false)
+      setImageFrequency(editNPC.image_frequency ?? 'sometimes')
+      setPreferredImageStyle(editNPC.preferred_image_style ?? 'photo')
+      if (editNPC.visual_persona) {
+        setVisualPersona(editNPC.visual_persona)
+      }
+      setReferenceImageUrl(editNPC.reference_image_url || '')
       
       // Load profile data for editing
       if (editNPC.profile) {
@@ -385,6 +433,10 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
         engagement_style: engagementStyle,
       }
 
+      // Build visual persona if any field is filled
+      const hasVisualPersona = Object.values(visualPersona).some(v => v.trim() !== '')
+      const finalVisualPersona = hasVisualPersona ? visualPersona : null
+
       if (isEditMode) {
         // Update existing NPC
         const payload = {
@@ -396,6 +448,14 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
           post_types: postTypes,
           posting_times: postingTimes,
           engagement_settings: engagementSettings,
+          // NPC type
+          npc_type: npcType,
+          // Image generation settings
+          generate_images: generateImages,
+          image_frequency: imageFrequency,
+          preferred_image_style: preferredImageStyle,
+          visual_persona: finalVisualPersona,
+          reference_image_url: referenceImageUrl || null,
           // Include profile updates
           profile: {
             full_name: displayName || null,
@@ -436,6 +496,14 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
           post_types: postTypes,
           posting_times: postingTimes,
           engagement_settings: engagementSettings,
+          // NPC type
+          npc_type: npcType,
+          // Image generation settings
+          generate_images: generateImages,
+          image_frequency: imageFrequency,
+          preferred_image_style: preferredImageStyle,
+          visual_persona: finalVisualPersona,
+          reference_image_url: referenceImageUrl || null,
         }
 
         const response = await fetch('/api/npc', {
@@ -493,9 +561,153 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
     setCommentsPerDay(5)
     setCommentOnTypes(['win', 'dream'])
     setEngagementStyle('supportive')
+    setNpcType('person')
+    setGenerateImages(false)
+    setImageFrequency('sometimes')
+    setPreferredImageStyle('photo')
+    setVisualPersona({
+      appearance: '',
+      style: '',
+      clothing: '',
+      environment: '',
+      photography_style: '',
+    })
+    setReferenceImageUrl('')
+    setGeneratingVisualPersona(false)
+    setGeneratingReferenceImage(false)
+    setQuickCreateDescription('')
+    setGeneratingNPC(false)
     setError(null)
     setUsernameError(null)
     onClose()
+  }
+
+  const handleGenerateVisualPersona = async () => {
+    if (!personaPrompt.trim()) {
+      setError('Please fill in the persona prompt first (Step 2)')
+      return
+    }
+
+    setGeneratingVisualPersona(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/npc/generate-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_visual_persona',
+          persona_name: personaName,
+          persona_prompt: personaPrompt,
+          ai_model: aiModel,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate visual persona')
+      }
+
+      if (data.visual_persona) {
+        setVisualPersona(data.visual_persona)
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate visual persona')
+    } finally {
+      setGeneratingVisualPersona(false)
+    }
+  }
+
+  const handleGenerateCompleteNPC = async () => {
+    if (!quickCreateDescription.trim() || quickCreateDescription.length < 10) {
+      setError('Please provide a description of at least 10 characters')
+      return
+    }
+
+    setGeneratingNPC(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/npc/generate-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_complete_npc',
+          description: quickCreateDescription,
+          ai_model: aiModel,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate NPC')
+      }
+
+      if (data.npc) {
+        const npc = data.npc
+        // Fill in all the fields
+        setUsername(npc.username)
+        setDisplayName(npc.display_name)
+        setBio(npc.bio)
+        setPersonaName(npc.persona_name)
+        setPersonaPrompt(npc.persona_prompt)
+        setTone(npc.tone)
+        setPostTypes(npc.post_types)
+        setVisualPersona(npc.visual_persona)
+        setGenerateImages(true) // Enable image generation by default
+        
+        // Clear the quick create field
+        setQuickCreateDescription('')
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate NPC')
+    } finally {
+      setGeneratingNPC(false)
+    }
+  }
+
+  const handleGenerateReferenceImage = async () => {
+    if (!editNPC?.id) {
+      setError('Please save the NPC first before generating a reference image')
+      return
+    }
+
+    if (!visualPersona.appearance) {
+      setError('Please fill in the visual persona first')
+      return
+    }
+
+    setGeneratingReferenceImage(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/npc/generate-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_reference_image',
+          npc_id: editNPC.id,
+          persona_name: personaName,
+          visual_persona: visualPersona,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate reference image')
+      }
+
+      if (data.reference_image_url) {
+        setReferenceImageUrl(data.reference_image_url)
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate reference image')
+    } finally {
+      setGeneratingReferenceImage(false)
+    }
   }
 
   if (!isOpen) return null
@@ -566,6 +778,63 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
                     : 'Create a new user account for this NPC'
                   }
                 </p>
+
+                {/* Quick Create with AI - Only show in create mode */}
+                {!isEditMode && (
+                  <div className="mb-6 p-4 bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-xl">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Sparkles size={20} className="text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-text">Quick Create with AI</h4>
+                        <p className="text-xs text-text-secondary">Describe your NPC and let AI fill in everything</p>
+                      </div>
+                    </div>
+                    
+                    <textarea
+                      placeholder="e.g., A witty startup coach who shares lessons from 10 years of building companies. Loves data, hates fluff. Has a dry sense of humor and frequently calls out BS in the startup world..."
+                      value={quickCreateDescription}
+                      onChange={(e) => setQuickCreateDescription(e.target.value)}
+                      rows={3}
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary resize-none mb-3"
+                    />
+                    
+                    <Button
+                      variant="primary"
+                      onClick={handleGenerateCompleteNPC}
+                      disabled={generatingNPC || quickCreateDescription.length < 10}
+                      className="w-full"
+                    >
+                      {generatingNPC ? (
+                        <>
+                          <RefreshCw size={16} className="animate-spin" />
+                          Generating NPC...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 size={16} />
+                          Generate Complete NPC
+                        </>
+                      )}
+                    </Button>
+                    
+                    {quickCreateDescription.length > 0 && quickCreateDescription.length < 10 && (
+                      <p className="text-xs text-text-tertiary mt-2">
+                        Add more detail ({10 - quickCreateDescription.length} more characters needed)
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Divider - only show in create mode */}
+                {!isEditMode && (
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-text-tertiary">or fill in manually</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                )}
                 
                 {/* Username */}
                 <div className="mb-4">
@@ -893,6 +1162,50 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold text-text mb-4">AI & Persona</h3>
+                
+                {/* NPC Type */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-text mb-3">
+                    NPC Type
+                  </label>
+                  <p className="text-xs text-text-secondary mb-3">
+                    Is this NPC a person or an object/brand account?
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setNpcType('person')}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        npcType === 'person'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <User size={24} className="text-primary" />
+                        <div className="text-left">
+                          <p className="font-medium text-text">Person</p>
+                          <p className="text-xs text-text-secondary">Human character with face</p>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setNpcType('object')}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        npcType === 'object'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Image size={24} className="text-primary" />
+                        <div className="text-left">
+                          <p className="font-medium text-text">Object/Brand</p>
+                          <p className="text-xs text-text-secondary">Product, food, thing (no face)</p>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
                 
                 {/* AI Model */}
                 <div className="mb-6">
@@ -1403,6 +1716,272 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                       ))}
                     </div>
                   </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {/* Step 6: Image Generation */}
+          {step === 6 && (
+            <div className="space-y-6">
+              <div>
+                <h3 className="text-lg font-semibold text-text mb-2">Image Generation</h3>
+                <p className="text-sm text-text-secondary mb-6">
+                  Configure AI-generated images for this NPC's posts. Requires GEMINI_API_KEY.
+                </p>
+                
+                {/* Enable/Disable */}
+                <div className="mb-6 p-4 bg-elevated rounded-xl">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                        <Image size={20} className="text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium text-text">Generate Images with Posts</p>
+                        <p className="text-xs text-text-secondary">AI will create images to accompany posts</p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => setGenerateImages(!generateImages)}
+                      className={`w-12 h-6 rounded-full transition-colors ${
+                        generateImages ? 'bg-primary' : 'bg-border'
+                      }`}
+                    >
+                      <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform ${
+                        generateImages ? 'translate-x-6' : 'translate-x-0.5'
+                      }`} />
+                    </button>
+                  </div>
+                </div>
+
+                {generateImages && (
+                  <>
+                    {/* Image Frequency */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-text mb-3">
+                        Image Frequency
+                      </label>
+                      <div className="space-y-2">
+                        {IMAGE_FREQUENCY_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setImageFrequency(option.value)}
+                            className={`w-full p-3 rounded-xl border-2 text-left transition-all ${
+                              imageFrequency === option.value
+                                ? 'border-primary bg-primary/5'
+                                : 'border-border hover:border-primary/50'
+                            }`}
+                          >
+                            <p className="font-medium text-text">{option.label}</p>
+                            <p className="text-xs text-text-secondary">{option.description}</p>
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Image Style */}
+                    <div className="mb-6">
+                      <label className="block text-sm font-medium text-text mb-3">
+                        Preferred Image Style
+                      </label>
+                      <div className="flex flex-wrap gap-2">
+                        {IMAGE_STYLE_OPTIONS.map((option) => (
+                          <button
+                            key={option.value}
+                            onClick={() => setPreferredImageStyle(option.value)}
+                            className={`px-4 py-2 rounded-lg text-sm font-medium transition-all ${
+                              preferredImageStyle === option.value
+                                ? 'bg-primary text-white'
+                                : 'bg-elevated text-text-secondary hover:bg-elevated/80'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Visual Persona */}
+                    <div className="mb-6">
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-text">
+                          Visual Persona
+                        </label>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleGenerateVisualPersona}
+                          disabled={generatingVisualPersona || !personaPrompt.trim()}
+                        >
+                          {generatingVisualPersona ? (
+                            <>
+                              <RefreshCw size={14} className="animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 size={14} />
+                              Generate with AI
+                            </>
+                          )}
+                        </Button>
+                      </div>
+                      <p className="text-xs text-text-secondary mb-4">
+                        Describe the character's visual appearance for consistent image generation. Use the AI button to auto-generate from the persona prompt.
+                      </p>
+                      
+                      <div className="space-y-4 p-4 bg-elevated rounded-xl">
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">
+                            {npcType === 'object' ? 'Object/Product Type' : 'Appearance'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={npcType === 'object' 
+                              ? "e.g., artisan sushi rolls, fresh ingredients, vibrant colors"
+                              : "e.g., 30s professional woman, warm brown skin, short natural curly hair"
+                            }
+                            value={visualPersona.appearance}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, appearance: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Style</label>
+                          <input
+                            type="text"
+                            placeholder={npcType === 'object'
+                              ? "e.g., Japanese minimalist, elegant plating, zen aesthetic"
+                              : "e.g., clean, modern, minimalist aesthetic"
+                            }
+                            value={visualPersona.style}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, style: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">
+                            {npcType === 'object' ? 'Presentation' : 'Clothing'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={npcType === 'object'
+                              ? "e.g., served on slate plates, bamboo accents, wasabi garnish"
+                              : "e.g., usually wears blazers, neutral tones, subtle gold jewelry"
+                            }
+                            value={visualPersona.clothing}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, clothing: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">
+                            {npcType === 'object' ? 'Setting' : 'Environment'}
+                          </label>
+                          <input
+                            type="text"
+                            placeholder={npcType === 'object'
+                              ? "e.g., traditional sushi bar, dark wood counter, moody lighting"
+                              : "e.g., modern office spaces, coffee shops, urban settings"
+                            }
+                            value={visualPersona.environment}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, environment: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                        <div>
+                          <label className="block text-xs text-text-secondary mb-1">Photography Style</label>
+                          <input
+                            type="text"
+                            placeholder={npcType === 'object'
+                              ? "e.g., food photography, overhead shots, macro details, appetizing"
+                              : "e.g., candid, natural lighting, shallow depth of field"
+                            }
+                            value={visualPersona.photography_style}
+                            onChange={(e) => setVisualPersona({ ...visualPersona, photography_style: e.target.value })}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Reference Image - Only for Person NPCs */}
+                    {npcType === 'person' && (
+                    <div className="p-4 bg-elevated rounded-xl">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <label className="block text-sm font-medium text-text">
+                            Reference Image
+                          </label>
+                          <p className="text-xs text-text-secondary">
+                            Used for character face consistency across generated images
+                          </p>
+                        </div>
+                        {isEditMode && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleGenerateReferenceImage}
+                            disabled={generatingReferenceImage || !visualPersona.appearance}
+                          >
+                            {generatingReferenceImage ? (
+                              <>
+                                <RefreshCw size={14} className="animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Wand2 size={14} />
+                                Generate Reference
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+
+                      {referenceImageUrl ? (
+                        <div className="flex items-start gap-4">
+                          <div className="w-24 h-24 rounded-xl border-2 border-primary overflow-hidden bg-surface flex-shrink-0">
+                            <img 
+                              src={referenceImageUrl} 
+                              alt="Reference" 
+                              className="w-full h-full object-cover"
+                              onError={() => setReferenceImageUrl('')}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm text-text font-medium mb-1">Reference Image Set</p>
+                            <p className="text-xs text-text-tertiary mb-2 break-all">
+                              {referenceImageUrl.length > 50 
+                                ? referenceImageUrl.substring(0, 50) + '...' 
+                                : referenceImageUrl}
+                            </p>
+                            <Button variant="ghost" size="sm" onClick={() => setReferenceImageUrl('')}>
+                              <X size={14} />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-text-tertiary mb-3">
+                            {isEditMode 
+                              ? 'Click "Generate Reference" to create a base image, or paste a URL below.'
+                              : 'Save the NPC first, then generate a reference image for consistency.'}
+                          </p>
+                          <input
+                            type="url"
+                            placeholder="Or paste image URL: https://example.com/reference.jpg"
+                            value={referenceImageUrl}
+                            onChange={(e) => setReferenceImageUrl(e.target.value)}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                      )}
+                    </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

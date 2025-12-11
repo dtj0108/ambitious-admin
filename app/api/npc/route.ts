@@ -91,6 +91,10 @@ export async function POST(request: NextRequest) {
       const npcEmail = `npc_${profile.username.toLowerCase()}@bot.ambitious.local`
       const npcPassword = crypto.randomUUID() // Random password, won't be used
       
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/d29235c4-fbd3-4077-b45b-7562ed3c0c13',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/npc/route.ts:94',message:'Before createUser',data:{npcEmail,username:profile.username,isServiceConfigured:!!supabaseAdmin},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H2,H3'})}).catch(()=>{});
+      // #endregion
+      
       const { data: authData, error: authError } = await supabaseAdmin.auth.admin.createUser({
         email: npcEmail,
         password: npcPassword,
@@ -101,8 +105,15 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      // #region agent log
+      fetch('http://127.0.0.1:7242/ingest/d29235c4-fbd3-4077-b45b-7562ed3c0c13',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/npc/route.ts:107',message:'After createUser',data:{hasAuthData:!!authData,hasUser:!!authData?.user,errorMessage:authError?.message,errorStatus:authError?.status,errorCode:(authError as any)?.code,fullError:JSON.stringify(authError)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H1,H4,H5'})}).catch(()=>{});
+      // #endregion
+
       if (authError || !authData.user) {
         console.error('Error creating auth user:', authError)
+        // #region agent log
+        fetch('http://127.0.0.1:7242/ingest/d29235c4-fbd3-4077-b45b-7562ed3c0c13',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({location:'app/api/npc/route.ts:114',message:'Auth error branch taken',data:{errorMessage:authError?.message,errorName:authError?.name,errorStack:authError?.stack?.substring(0,200)},timestamp:Date.now(),sessionId:'debug-session',hypothesisId:'H4'})}).catch(()=>{});
+        // #endregion
         return NextResponse.json(
           { error: `Failed to create NPC account: ${authError?.message || 'Unknown error'}` },
           { status: 500 }
@@ -204,6 +215,14 @@ export async function POST(request: NextRequest) {
       custom_cron: body.custom_cron || null,
       engagement_settings: { ...defaultEngagementSettings, ...body.engagement_settings },
       is_active: body.is_active ?? true,
+      // NPC type
+      npc_type: body.npc_type || 'person',
+      // Image generation settings
+      generate_images: body.generate_images ?? false,
+      image_frequency: body.image_frequency || 'sometimes',
+      preferred_image_style: body.preferred_image_style || 'photo',
+      visual_persona: body.visual_persona || null,
+      reference_image_url: body.reference_image_url || null,
     }
 
     const { data: npc, error: npcError } = await supabaseAdmin

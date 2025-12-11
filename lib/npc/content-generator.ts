@@ -1,17 +1,37 @@
 import { createAIProvider } from './ai-providers'
 import { addToQueue, getNPCById, getRecentNPCPosts } from '../queries-npc'
 import { calculateMultiplePostTimes, getPostsToGenerate } from './schedule-utils'
+import { generateImagePrompt, buildCompleteImagePrompt } from './image-prompt-generator'
+import { createGeminiImageProvider, isGeminiConfigured, fetchImageAsBase64 } from './gemini-provider'
+import { uploadNPCImage } from './image-storage'
 import type { 
   ContentGenerationOptions, 
   ScheduledPost, 
   GeneratePostRequest 
 } from './types'
-import type { NPCProfile, PostType, PostingTimes } from '../queries-npc'
+import type { NPCProfile, PostType, PostingTimes, ImageFrequency } from '../queries-npc'
 
 export class ContentGenerator {
   /**
    * Generate posts for an NPC and add them to the queue
    */
+  /**
+   * Determine if an image should be generated based on frequency setting
+   */
+  private static shouldGenerateImage(frequency: ImageFrequency): boolean {
+    const random = Math.random()
+    switch (frequency) {
+      case 'always':
+        return true
+      case 'sometimes':
+        return random < 0.5 // 50% chance
+      case 'rarely':
+        return random < 0.25 // 25% chance
+      default:
+        return false
+    }
+  }
+
   static async generatePosts(options: ContentGenerationOptions): Promise<ScheduledPost[]> {
     const {
       npcId,
@@ -26,21 +46,63 @@ export class ContentGenerator {
       temperature,
       postingTimes,
       count = 1,
+      generateImages = false,
+      imageFrequency = 'sometimes',
+      preferredImageStyle = 'photo',
+      visualPersona = null,
+      referenceImageUrl = null,
+      npcType = 'person',
     } = options
 
     const provider = createAIProvider(aiModel, { temperature })
     const generatedPosts: ScheduledPost[] = []
+    const isObjectNpc = npcType === 'object'
     
     // Fetch recent posts from the database to avoid repetition across sessions
     const historicalPosts = await getRecentNPCPosts(npcId, 15)
     const previousContents: string[] = [...historicalPosts]
     
     console.log(`[ContentGenerator] Loaded ${historicalPosts.length} historical posts for context`)
+    console.log(`[ContentGenerator] NPC type: ${npcType}`)
+    
+    // Pre-fetch reference image for character consistency (only for person NPCs)
+    let referenceImageData: { data: string; mimeType: string } | null = null
+    if (referenceImageUrl && generateImages && !isObjectNpc) {
+      console.log(`[ContentGenerator] Fetching reference image for person consistency: ${referenceImageUrl}`)
+      referenceImageData = await fetchImageAsBase64(referenceImageUrl)
+      if (referenceImageData) {
+        console.log('[ContentGenerator] Reference image loaded successfully')
+      }
+    }
 
     // Calculate random schedule times based on posting configuration
     const scheduleTimes = postingTimes
       ? calculateMultiplePostTimes(postingTimes, count)
       : this.calculateLegacyScheduleTimes(count)
+
+    // Check if we can generate images
+    const canGenerateImages = generateImages && isGeminiConfigured()
+    if (generateImages && !isGeminiConfigured()) {
+      console.warn('[ContentGenerator] Image generation enabled but GEMINI_API_KEY not configured')
+    }
+
+    // Length hinting: keep the NPC "free", but strongly encourage visible variety.
+    // This is intentionally random per post to avoid the model drifting to a consistent safe length.
+    const pickLengthHint = (): string => {
+      const r = Math.random()
+
+      // Slight bias towards extremes (one-liner / long) to force range.
+      if (r < 0.35) {
+        return 'Length target: ONE-LINER (5–20 words, 1 sentence). Do not mention word counts or labels.'
+      }
+      if (r < 0.55) {
+        return 'Length target: SHORT (20–45 words, 1–2 sentences). Do not mention word counts or labels.'
+      }
+      if (r < 0.75) {
+        return 'Length target: MEDIUM (45–90 words, 2–5 sentences). Do not mention word counts or labels.'
+      }
+      return 'Length target: LONG (90–160 words, 4–10 sentences; 1 line break allowed if natural). Do not mention word counts or labels.'
+    }
 
     for (let i = 0; i < count; i++) {
       // Pick a random post type from allowed types
@@ -54,13 +116,88 @@ export class ContentGenerator {
         tone,
         postType,
         previousPosts: previousContents, // For avoiding repetition
+        additionalContext: pickLengthHint(),
       }
 
       try {
+        console.log(
+          `[ContentGenerator] Generating post ${i + 1}/${count} (${postType}) lengthHint="${request.additionalContext}" previousPosts=${previousContents.length}`
+        )
         const response = await provider.generatePost(request)
         
         // Use pre-calculated random schedule time
         const scheduledFor = scheduleTimes[i]
+
+        let imageUrl: string | null = null
+        let imagePrompt: string | null = null
+
+        // Generate image if enabled and random check passes
+        if (canGenerateImages && this.shouldGenerateImage(imageFrequency)) {
+          try {
+            console.log(`[ContentGenerator] Generating image for post ${i + 1}`)
+            
+            // Step 1: Generate image prompt from text AI
+            const promptResult = await generateImagePrompt({
+              postContent: response.content,
+              postType: response.postType,
+              personaName,
+              tone,
+              visualPersona,
+              preferredStyle: preferredImageStyle,
+              aiModel,
+              temperature,
+              isObjectNpc,
+            })
+
+            // Step 2: Build complete prompt with visual persona
+            const completePrompt = buildCompleteImagePrompt(
+              promptResult,
+              visualPersona,
+              preferredImageStyle,
+              isObjectNpc
+            )
+            imagePrompt = completePrompt
+
+            // Step 3: Generate image with Gemini
+            const gemini = createGeminiImageProvider()
+            let imageResult
+            
+            // Use reference image for character consistency if available
+            if (referenceImageData) {
+              console.log('[ContentGenerator] Using reference image for character consistency')
+              imageResult = await gemini.generateImageWithReference(
+                {
+                  prompt: completePrompt,
+                  visualPersona,
+                  style: preferredImageStyle,
+                },
+                referenceImageData.data,
+                referenceImageData.mimeType
+              )
+            } else {
+              imageResult = await gemini.generateImage({
+                prompt: completePrompt,
+                visualPersona,
+                style: preferredImageStyle,
+              })
+            }
+
+            // Step 4: Upload to storage
+            const uploadResult = await uploadNPCImage(
+              imageResult.imageData,
+              imageResult.mimeType,
+              npcId
+            )
+
+            if (uploadResult) {
+              imageUrl = uploadResult.url
+              console.log(`[ContentGenerator] Image uploaded: ${imageUrl}`)
+            }
+          } catch (imageError) {
+            console.error(`[ContentGenerator] Error generating image:`, imageError)
+            // Continue without image
+          }
+        }
 
         const post: ScheduledPost = {
           content: response.content,
@@ -68,10 +205,13 @@ export class ContentGenerator {
           scheduledFor,
           generationPrompt: JSON.stringify(request),
           aiModelUsed: aiModel,
+          imageUrl,
+          imagePrompt,
         }
 
         generatedPosts.push(post)
-        previousContents.push(response.content)
+        // Keep most-recent-first so the prompt sees the latest post during a batch.
+        previousContents.unshift(response.content)
 
         // Add to queue
         await addToQueue({
@@ -81,6 +221,8 @@ export class ContentGenerator {
           scheduled_for: post.scheduledFor,
           generation_prompt: post.generationPrompt,
           ai_model_used: post.aiModelUsed,
+          image_url: post.imageUrl,
+          image_prompt: post.imagePrompt,
         })
 
         // Small delay to avoid rate limits
@@ -137,6 +279,14 @@ export class ContentGenerator {
       temperature: npc.temperature, // AI creativity setting
       postingTimes: npc.posting_times, // Pass schedule configuration
       count,
+      // Image generation settings
+      generateImages: npc.generate_images,
+      imageFrequency: npc.image_frequency,
+      preferredImageStyle: npc.preferred_image_style,
+      visualPersona: npc.visual_persona,
+      // Use reference_image_url if set, otherwise fall back to avatar for character consistency (person NPCs only)
+      referenceImageUrl: npc.npc_type === 'object' ? null : (npc.reference_image_url || npc.profile?.avatar_url || null),
+      npcType: npc.npc_type || 'person',
     })
   }
 
