@@ -1,6 +1,107 @@
 import { createAIProvider } from './ai-providers'
 import type { VisualPersona, PostType, Tone, AIModel, ImageStyle } from '../queries-npc'
 
+export interface GenerateVisualPersonaRequest {
+  personaName: string
+  personaPrompt: string
+  aiModel: AIModel
+  temperature?: number
+}
+
+/**
+ * Use AI to generate a visual persona based on the text persona
+ */
+export async function generateVisualPersonaFromText(
+  request: GenerateVisualPersonaRequest
+): Promise<VisualPersona> {
+  const provider = createAIProvider(request.aiModel, { temperature: request.temperature || 0.7 })
+
+  const systemPrompt = `You are an expert at creating visual character descriptions for AI image generation.
+Based on a character's personality and background, create a detailed visual persona that will ensure consistent character appearance across multiple AI-generated images.
+
+Rules:
+1. Create a specific, memorable appearance (age, ethnicity, hair, facial features, build)
+2. Define a consistent personal style and aesthetic
+3. Describe typical clothing choices that match their personality
+4. Suggest environments where they'd naturally be found
+5. Define a photography/image style that suits their vibe
+
+Respond with ONLY a JSON object in this exact format:
+{
+  "appearance": "Physical description: age range, ethnicity/skin tone, hair (color, style, length), facial features, build/height",
+  "style": "Overall aesthetic and personal style",
+  "clothing": "Typical clothing, colors, accessories",
+  "environment": "Common settings and backgrounds",
+  "photography_style": "Image style: lighting, composition, mood"
+}`
+
+  const userPrompt = `Create a visual persona for this character:
+
+Name: ${request.personaName}
+Character Prompt: ${request.personaPrompt}
+
+Remember to respond with ONLY valid JSON.`
+
+  try {
+    const response = await provider.generatePost({
+      personaName: 'Visual Persona Generator',
+      personaDescription: systemPrompt,
+      personaPrompt: systemPrompt,
+      topics: [],
+      tone: 'professional',
+      postType: 'general',
+      additionalContext: userPrompt,
+    })
+
+    const content = response.content.trim()
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      return {
+        appearance: parsed.appearance || '',
+        style: parsed.style || '',
+        clothing: parsed.clothing || '',
+        environment: parsed.environment || '',
+        photography_style: parsed.photography_style || '',
+      }
+    }
+
+    throw new Error('Failed to parse visual persona JSON')
+  } catch (error) {
+    console.error('[VisualPersonaGenerator] Error:', error)
+    // Return a basic fallback
+    return {
+      appearance: `${request.personaName}, professional appearance`,
+      style: 'Modern, clean aesthetic',
+      clothing: 'Business casual attire',
+      environment: 'Modern office or urban settings',
+      photography_style: 'Natural lighting, candid style',
+    }
+  }
+}
+
+/**
+ * Generate a prompt for creating a reference/base image of a character
+ */
+export function buildReferenceImagePrompt(visualPersona: VisualPersona, personaName: string): string {
+  return `Create a professional headshot/portrait photograph of a person.
+
+THE PERSON (must match exactly):
+- ${visualPersona.appearance}
+- Style: ${visualPersona.style}
+- Wearing: ${visualPersona.clothing}
+
+REQUIREMENTS:
+- Clear, well-lit portrait showing face and upper body
+- Neutral but warm expression, approachable
+- Clean, simple background (solid color or subtle gradient)
+- High quality, professional photography
+- This will be used as a reference for future images of this character
+
+Photography style: ${visualPersona.photography_style || 'Professional portrait, soft natural lighting'}`
+}
+
 export interface ImagePromptRequest {
   postContent: string
   postType: PostType

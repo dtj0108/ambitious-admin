@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Bot, Zap, Brain, Plus, User, Upload, Tag, Search, ChevronDown, ChevronRight, Sparkles, Image } from 'lucide-react'
+import { X, Bot, Zap, Brain, Plus, User, Upload, Tag, Search, ChevronDown, ChevronRight, Sparkles, Image, Wand2, RefreshCw } from 'lucide-react'
 import { Button } from './Button'
 import type { 
   AIModel, 
@@ -128,6 +128,8 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
     photography_style: '',
   })
   const [referenceImageUrl, setReferenceImageUrl] = useState('')
+  const [generatingVisualPersona, setGeneratingVisualPersona] = useState(false)
+  const [generatingReferenceImage, setGeneratingReferenceImage] = useState(false)
   
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -557,9 +559,90 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
       photography_style: '',
     })
     setReferenceImageUrl('')
+    setGeneratingVisualPersona(false)
+    setGeneratingReferenceImage(false)
     setError(null)
     setUsernameError(null)
     onClose()
+  }
+
+  const handleGenerateVisualPersona = async () => {
+    if (!personaPrompt.trim()) {
+      setError('Please fill in the persona prompt first (Step 2)')
+      return
+    }
+
+    setGeneratingVisualPersona(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/npc/generate-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_visual_persona',
+          persona_name: personaName,
+          persona_prompt: personaPrompt,
+          ai_model: aiModel,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate visual persona')
+      }
+
+      if (data.visual_persona) {
+        setVisualPersona(data.visual_persona)
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate visual persona')
+    } finally {
+      setGeneratingVisualPersona(false)
+    }
+  }
+
+  const handleGenerateReferenceImage = async () => {
+    if (!editNPC?.id) {
+      setError('Please save the NPC first before generating a reference image')
+      return
+    }
+
+    if (!visualPersona.appearance) {
+      setError('Please fill in the visual persona first')
+      return
+    }
+
+    setGeneratingReferenceImage(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/npc/generate-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_reference_image',
+          npc_id: editNPC.id,
+          persona_name: personaName,
+          visual_persona: visualPersona,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate reference image')
+      }
+
+      if (data.reference_image_url) {
+        setReferenceImageUrl(data.reference_image_url)
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate reference image')
+    } finally {
+      setGeneratingReferenceImage(false)
+    }
   }
 
   if (!isOpen) return null
@@ -1555,11 +1638,31 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
 
                     {/* Visual Persona */}
                     <div className="mb-6">
-                      <label className="block text-sm font-medium text-text mb-2">
-                        Visual Persona
-                      </label>
+                      <div className="flex items-center justify-between mb-2">
+                        <label className="block text-sm font-medium text-text">
+                          Visual Persona
+                        </label>
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={handleGenerateVisualPersona}
+                          disabled={generatingVisualPersona || !personaPrompt.trim()}
+                        >
+                          {generatingVisualPersona ? (
+                            <>
+                              <RefreshCw size={14} className="animate-spin" />
+                              Generating...
+                            </>
+                          ) : (
+                            <>
+                              <Wand2 size={14} />
+                              Generate with AI
+                            </>
+                          )}
+                        </Button>
+                      </div>
                       <p className="text-xs text-text-secondary mb-4">
-                        Describe the character's visual appearance for consistent image generation.
+                        Describe the character's visual appearance for consistent image generation. Use the AI button to auto-generate from the persona prompt.
                       </p>
                       
                       <div className="space-y-4 p-4 bg-elevated rounded-xl">
@@ -1617,20 +1720,78 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                     </div>
 
                     {/* Reference Image URL */}
-                    <div>
-                      <label className="block text-sm font-medium text-text mb-2">
-                        Reference Image URL (Optional)
-                      </label>
-                      <p className="text-xs text-text-secondary mb-2">
-                        Provide a reference image for better character consistency
-                      </p>
-                      <input
-                        type="url"
-                        placeholder="https://example.com/reference-image.jpg"
-                        value={referenceImageUrl}
-                        onChange={(e) => setReferenceImageUrl(e.target.value)}
-                        className="w-full h-10 px-3 bg-elevated border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
-                      />
+                    {/* Reference Image */}
+                    <div className="p-4 bg-elevated rounded-xl">
+                      <div className="flex items-center justify-between mb-3">
+                        <div>
+                          <label className="block text-sm font-medium text-text">
+                            Reference Image
+                          </label>
+                          <p className="text-xs text-text-secondary">
+                            Used for character consistency across generated images
+                          </p>
+                        </div>
+                        {isEditMode && (
+                          <Button
+                            variant="secondary"
+                            size="sm"
+                            onClick={handleGenerateReferenceImage}
+                            disabled={generatingReferenceImage || !visualPersona.appearance}
+                          >
+                            {generatingReferenceImage ? (
+                              <>
+                                <RefreshCw size={14} className="animate-spin" />
+                                Generating...
+                              </>
+                            ) : (
+                              <>
+                                <Wand2 size={14} />
+                                Generate Reference
+                              </>
+                            )}
+                          </Button>
+                        )}
+                      </div>
+
+                      {referenceImageUrl ? (
+                        <div className="flex items-start gap-4">
+                          <div className="w-24 h-24 rounded-xl border-2 border-primary overflow-hidden bg-surface flex-shrink-0">
+                            <img 
+                              src={referenceImageUrl} 
+                              alt="Reference" 
+                              className="w-full h-full object-cover"
+                              onError={() => setReferenceImageUrl('')}
+                            />
+                          </div>
+                          <div className="flex-1">
+                            <p className="text-sm text-text font-medium mb-1">Reference Image Set</p>
+                            <p className="text-xs text-text-tertiary mb-2 break-all">
+                              {referenceImageUrl.length > 50 
+                                ? referenceImageUrl.substring(0, 50) + '...' 
+                                : referenceImageUrl}
+                            </p>
+                            <Button variant="ghost" size="sm" onClick={() => setReferenceImageUrl('')}>
+                              <X size={14} />
+                              Remove
+                            </Button>
+                          </div>
+                        </div>
+                      ) : (
+                        <div>
+                          <p className="text-sm text-text-tertiary mb-3">
+                            {isEditMode 
+                              ? 'Click "Generate Reference" to create a base image, or paste a URL below.'
+                              : 'Save the NPC first, then generate a reference image for consistency.'}
+                          </p>
+                          <input
+                            type="url"
+                            placeholder="Or paste image URL: https://example.com/reference.jpg"
+                            value={referenceImageUrl}
+                            onChange={(e) => setReferenceImageUrl(e.target.value)}
+                            className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
+                          />
+                        </div>
+                      )}
                     </div>
                   </>
                 )}
