@@ -17,3 +17,4 @@ COMMENT ON COLUMN npc_profiles.persona_prompt IS 'Full character prompt for AI c
 COMMENT ON COLUMN npc_profiles.persona_description IS 'DEPRECATED: Use persona_prompt instead. Kept for backwards compatibility.';
 COMMENT ON COLUMN npc_profiles.topics IS 'DEPRECATED: Use persona_prompt instead. Kept for backwards compatibility.';
 
+

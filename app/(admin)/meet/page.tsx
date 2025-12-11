@@ -6,17 +6,41 @@ import {
   Heart, UserCheck, UserX, Clock, TrendingUp, Users, 
   Filter, X, ChevronDown, ChevronUp, Percent, User, ArrowRight
 } from 'lucide-react'
-import {
-  getMeetStats,
-  getMeetRequests,
-  getMeetRequestById,
-  getSwipeActivityTrend,
-  type MeetStats,
-  type MeetRequestWithUsers,
-  type MeetRequestStatus,
-  type MeetDateRange,
-  type SwipeActivityDay,
-} from '@/lib/queries'
+
+type MeetRequestStatus = 'pending' | 'accepted' | 'rejected'
+type MeetDateRange = 'all' | 'today' | '7d' | '30d'
+
+interface MeetStats {
+  totalRequests: number
+  pending: number
+  accepted: number
+  rejected: number
+  totalSwipes7d: number
+  swipesByAction: Record<string, number>
+  matchRate: number
+}
+
+interface MeetRequestWithUsers {
+  id: string
+  requester_id: string
+  recipient_id: string
+  status: MeetRequestStatus
+  created_at: string
+  responded_at: string | null
+  requester_username: string
+  requester_full_name: string | null
+  requester_avatar_url: string | null
+  recipient_username: string
+  recipient_full_name: string | null
+  recipient_avatar_url: string | null
+}
+
+interface SwipeActivityDay {
+  date: string
+  label: string
+  count: number
+  byAction: Record<string, number>
+}
 
 // Status configuration
 const statusConfig: Record<string, { label: string; className: string }> = {
@@ -54,12 +78,18 @@ export default function MeetPage() {
   // Fetch stats and swipe trend
   useEffect(() => {
     async function fetchData() {
-      const [statsData, trendData] = await Promise.all([
-        getMeetStats(),
-        getSwipeActivityTrend(7),
-      ])
-      setStats(statsData)
-      setSwipeTrend(trendData)
+      try {
+        const [statsRes, trendRes] = await Promise.all([
+          fetch('/api/admin/meet?action=stats'),
+          fetch('/api/admin/meet?action=swipeTrend&days=7'),
+        ])
+        const statsData = await statsRes.json()
+        const trendData = await trendRes.json()
+        setStats(statsData.stats || null)
+        setSwipeTrend(trendData.trend || [])
+      } catch (error) {
+        console.error('Error fetching meet data:', error)
+      }
     }
     fetchData()
   }, [])
@@ -67,15 +97,24 @@ export default function MeetPage() {
   // Fetch requests
   const fetchRequests = useCallback(async () => {
     setLoading(true)
-    const result = await getMeetRequests({
-      page,
-      limit,
-      status: statusFilter === 'all' ? undefined : statusFilter,
-      dateRange,
-    })
-    setRequests(result.requests)
-    setTotalPages(result.totalPages)
-    setTotal(result.total)
+    try {
+      const params = new URLSearchParams({
+        action: 'list',
+        page: page.toString(),
+        limit: limit.toString(),
+        dateRange,
+      })
+      if (statusFilter !== 'all') {
+        params.set('status', statusFilter)
+      }
+      const res = await fetch(`/api/admin/meet?${params}`)
+      const data = await res.json()
+      setRequests(data.requests || [])
+      setTotalPages(data.totalPages || 0)
+      setTotal(data.total || 0)
+    } catch (error) {
+      console.error('Error fetching meet requests:', error)
+    }
     setLoading(false)
   }, [page, limit, statusFilter, dateRange])
 
@@ -90,10 +129,15 @@ export default function MeetPage() {
 
   // Open modal
   const handleViewRequest = async (request: MeetRequestWithUsers) => {
-    const fullRequest = await getMeetRequestById(request.id)
-    if (fullRequest) {
-      setSelectedRequest(fullRequest)
-      setModalOpen(true)
+    try {
+      const res = await fetch(`/api/admin/meet?action=byId&id=${request.id}`)
+      const data = await res.json()
+      if (data.request) {
+        setSelectedRequest(data.request)
+        setModalOpen(true)
+      }
+    } catch (error) {
+      console.error('Error fetching meet request details:', error)
     }
   }
 

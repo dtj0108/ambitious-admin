@@ -12,3 +12,4 @@ CHECK (ai_model IN ('openai', 'claude', 'xai'));
 -- Add comment
 COMMENT ON COLUMN npc_profiles.ai_model IS 'AI model provider: openai (GPT-4o), claude (Sonnet), or xai (Grok)';
 
+

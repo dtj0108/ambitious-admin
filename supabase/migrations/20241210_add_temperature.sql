@@ -12,3 +12,4 @@ ADD CONSTRAINT temperature_range CHECK (temperature >= 0 AND temperature <= 1);
 -- Add comment explaining the column
 COMMENT ON COLUMN npc_profiles.temperature IS 'AI creativity/randomness setting. 0.0 = focused on prompt, 1.0 = more creative and varied. Default is 0.8.';
 
+

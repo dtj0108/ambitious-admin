@@ -15,12 +15,26 @@ import {
   TrendingUp,
   Lock,
 } from 'lucide-react'
-import { 
-  getMessageStats, 
-  getMessageActivityTrend,
-  type MessageStats,
-  type MessageActivityPoint,
-} from '@/lib/queries'
+
+interface MessageStats {
+  total: number
+  messagesToday: number
+  messagesThisWeek: number
+  activeConversations7d: number
+  uniqueSenders7d: number
+  byType: {
+    text: number
+    system: number
+    image: number
+    video: number
+  }
+}
+
+interface MessageActivityPoint {
+  date: string
+  label: string
+  count: number
+}
 
 export default function MessagesPage() {
   const [stats, setStats] = useState<MessageStats | null>(null)
@@ -29,12 +43,18 @@ export default function MessagesPage() {
 
   const fetchData = async () => {
     setLoading(true)
-    const [statsData, trendData] = await Promise.all([
-      getMessageStats(),
-      getMessageActivityTrend(7),
-    ])
-    setStats(statsData)
-    setTrend(trendData)
+    try {
+      const [statsRes, trendRes] = await Promise.all([
+        fetch('/api/admin/messages?action=stats'),
+        fetch('/api/admin/messages?action=trend&days=7'),
+      ])
+      const statsData = await statsRes.json()
+      const trendData = await trendRes.json()
+      setStats(statsData.stats || null)
+      setTrend(trendData.trend || [])
+    } catch (error) {
+      console.error('Error fetching messages data:', error)
+    }
     setLoading(false)
   }
 

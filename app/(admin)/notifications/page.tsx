@@ -6,16 +6,36 @@ import {
   Bell, Heart, MessageSquare, UserPlus, AtSign, Eye, EyeOff, 
   Filter, X, ChevronDown, ChevronUp, Calendar, Clock, User
 } from 'lucide-react'
-import { 
-  getNotificationStats,
-  getNotifications,
-  getNotificationById,
-  type NotificationStats, 
-  type NotificationWithContext,
-  type NotificationType,
-  type NotificationDateRange,
-  type NotificationReadStatus,
-} from '@/lib/queries'
+
+type NotificationType = 'like' | 'comment' | 'follow' | 'message' | 'mention' | 'post_hidden'
+type NotificationDateRange = 'all' | 'today' | '7d' | '30d'
+type NotificationReadStatus = 'all' | 'read' | 'unread'
+
+interface NotificationStats {
+  total: number
+  unread: number
+  notificationsToday: number
+  dismissed: number
+  byType: Record<string, number>
+}
+
+interface NotificationWithContext {
+  id: string
+  user_id: string
+  type: NotificationType
+  actor_id: string | null
+  post_id: string | null
+  comment_id: string | null
+  conversation_id: string | null
+  content: string | null
+  read_at: string | null
+  dismissed_at: string | null
+  created_at: string
+  recipient_username: string
+  recipient_avatar_url: string | null
+  actor_username: string | null
+  actor_avatar_url: string | null
+}
 
 // Notification type configuration
 const notificationTypeConfig: Record<string, { label: string; icon: React.ComponentType<{ size?: number; className?: string }>; color: string }> = {
@@ -49,8 +69,13 @@ export default function NotificationsPage() {
   // Fetch stats
   useEffect(() => {
     async function fetchStats() {
-      const statsData = await getNotificationStats()
-      setStats(statsData)
+      try {
+        const res = await fetch('/api/admin/notifications?action=stats')
+        const data = await res.json()
+        setStats(data.stats || null)
+      } catch (error) {
+        console.error('Error fetching notification stats:', error)
+      }
     }
     fetchStats()
   }, [])
@@ -58,16 +83,25 @@ export default function NotificationsPage() {
   // Fetch notifications
   const fetchNotifications = useCallback(async () => {
     setLoading(true)
-    const result = await getNotifications({
-      page,
-      limit,
-      type: typeFilter === 'all' ? undefined : typeFilter,
-      readStatus,
-      dateRange,
-    })
-    setNotifications(result.notifications)
-    setTotalPages(result.totalPages)
-    setTotal(result.total)
+    try {
+      const params = new URLSearchParams({
+        action: 'list',
+        page: page.toString(),
+        limit: limit.toString(),
+        readStatus,
+        dateRange,
+      })
+      if (typeFilter !== 'all') {
+        params.set('type', typeFilter)
+      }
+      const res = await fetch(`/api/admin/notifications?${params}`)
+      const data = await res.json()
+      setNotifications(data.notifications || [])
+      setTotalPages(data.totalPages || 0)
+      setTotal(data.total || 0)
+    } catch (error) {
+      console.error('Error fetching notifications:', error)
+    }
     setLoading(false)
   }, [page, limit, typeFilter, readStatus, dateRange])
 
@@ -82,10 +116,15 @@ export default function NotificationsPage() {
 
   // Open modal
   const handleViewNotification = async (notification: NotificationWithContext) => {
-    const fullNotification = await getNotificationById(notification.id)
-    if (fullNotification) {
-      setSelectedNotification(fullNotification)
-      setModalOpen(true)
+    try {
+      const res = await fetch(`/api/admin/notifications?action=byId&id=${notification.id}`)
+      const data = await res.json()
+      if (data.notification) {
+        setSelectedNotification(data.notification)
+        setModalOpen(true)
+      }
+    } catch (error) {
+      console.error('Error fetching notification details:', error)
     }
   }
 

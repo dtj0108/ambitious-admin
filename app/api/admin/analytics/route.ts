@@ -93,21 +93,30 @@ export async function GET(request: Request) {
 
     const { data: trendData } = await trendQuery
 
-    const eventsByDate: Record<string, number> = {}
+    const eventsByDate: Record<string, { count: number; byPlatform: Record<string, number> }> = {}
     // Initialize all days
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
       const dateStr = date.toISOString().split('T')[0]
-      eventsByDate[dateStr] = 0
+      eventsByDate[dateStr] = { count: 0, byPlatform: {} }
     }
     trendData?.forEach(e => {
       const date = new Date(e.created_at).toISOString().split('T')[0]
-      eventsByDate[date] = (eventsByDate[date] || 0) + 1
+      if (!eventsByDate[date]) {
+        eventsByDate[date] = { count: 0, byPlatform: {} }
+      }
+      eventsByDate[date].count++
+      const p = e.platform || 'unknown'
+      eventsByDate[date].byPlatform[p] = (eventsByDate[date].byPlatform[p] || 0) + 1
     })
 
     const trend = Object.entries(eventsByDate)
-      .map(([date, count]) => ({ date, count }))
+      .map(([date, data]) => {
+        const d = new Date(date)
+        const label = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
+        return { date, label, count: data.count, byPlatform: data.byPlatform }
+      })
       .sort((a, b) => a.date.localeCompare(b.date))
 
     // ===== TOP EVENTS =====
@@ -122,8 +131,13 @@ export async function GET(request: Request) {
       eventCounts[e.event_name] = (eventCounts[e.event_name] || 0) + 1
     })
 
+    const totalEventCount = Object.values(eventCounts).reduce((a, b) => a + b, 0)
     const topEvents = Object.entries(eventCounts)
-      .map(([name, count]) => ({ name, count }))
+      .map(([eventName, count]) => ({ 
+        eventName, 
+        count, 
+        percentage: totalEventCount > 0 ? Math.round((count / totalEventCount) * 100) : 0 
+      }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 10)
 
@@ -134,20 +148,38 @@ export async function GET(request: Request) {
       percentage: totalEvents > 0 ? Math.round((count / totalEvents) * 100) : 0,
     }))
 
-    // ===== RETENTION (simplified) =====
+    // ===== RETENTION (DAU/WAU/MAU) =====
+    const retentionStartOfToday = getStartOfToday()
+    const retentionSevenDaysAgo = getDaysAgo(7)
+    const retentionThirtyDaysAgo = getDaysAgo(30)
+    
+    const [dauResult, wauResult, mauResult] = await Promise.all([
+      supabaseAdmin.from('analytics_events').select('user_id').gte('created_at', retentionStartOfToday),
+      supabaseAdmin.from('analytics_events').select('user_id').gte('created_at', retentionSevenDaysAgo),
+      supabaseAdmin.from('analytics_events').select('user_id').gte('created_at', retentionThirtyDaysAgo),
+    ])
+
+    const dau = new Set(dauResult.data?.map(e => e.user_id).filter(Boolean)).size
+    const wau = new Set(wauResult.data?.map(e => e.user_id).filter(Boolean)).size
+    const mau = new Set(mauResult.data?.map(e => e.user_id).filter(Boolean)).size
+
+    const dauWauRatio = wau > 0 ? Math.round((dau / wau) * 100) : 0
+    const dauMauRatio = mau > 0 ? Math.round((dau / mau) * 100) : 0
+
     const retention = {
-      day1: 0,
-      day7: 0,
-      day30: 0,
-      cohorts: [] as Array<{ date: string; day1: number; day7: number; day30: number }>,
+      dau,
+      wau,
+      mau,
+      dauWauRatio,
+      dauMauRatio,
     }
 
     // ===== FUNNEL (simplified) =====
     const funnel = [
-      { step: 'Visit', count: uniqueSessions, percentage: 100 },
-      { step: 'Signup', count: 0, percentage: 0 },
-      { step: 'First Post', count: 0, percentage: 0 },
-      { step: 'First Follow', count: 0, percentage: 0 },
+      { name: 'Visit', eventName: 'session_start', count: uniqueSessions, conversionRate: 100, dropOffRate: 0 },
+      { name: 'Signup', eventName: 'signup_completed', count: 0, conversionRate: 0, dropOffRate: 100 },
+      { name: 'First Post', eventName: 'first_post', count: 0, conversionRate: 0, dropOffRate: 0 },
+      { name: 'First Follow', eventName: 'first_follow', count: 0, conversionRate: 0, dropOffRate: 0 },
     ]
 
     // ===== SESSION INSIGHTS (simplified) =====
@@ -258,27 +290,30 @@ export async function GET(request: Request) {
     }
 
     // ===== LOOP METRICS =====
-    let loopQuery = supabaseAdmin.from('analytics_events').select('event_name, created_at')
+    let loopQuery = supabaseAdmin.from('analytics_events').select('event_name, created_at, user_id')
       .gte('created_at', monthStartDate.toISOString())
-      .ilike('event_name', 'loop%')
+      .ilike('event_name', '%loop%')
 
     const { data: loopData } = await loopQuery
 
     const loopCounts = {
       views: { today: 0, week: 0, month: 0 },
-      plays: { today: 0, week: 0, month: 0 },
-      completions: { today: 0, week: 0, month: 0 },
-      shares: { today: 0, week: 0, month: 0 },
+      likes: { today: 0, week: 0, month: 0 },
+      comments: { today: 0, week: 0, month: 0 },
     }
+
+    const loopViewers = new Set<string>()
 
     loopData?.forEach(e => {
       const eventDate = new Date(e.created_at)
       let category: keyof typeof loopCounts | null = null
       
-      if (e.event_name.includes('view')) category = 'views'
-      else if (e.event_name.includes('play')) category = 'plays'
-      else if (e.event_name.includes('complete')) category = 'completions'
-      else if (e.event_name.includes('share')) category = 'shares'
+      if (e.event_name.includes('view')) {
+        category = 'views'
+        if (e.user_id) loopViewers.add(e.user_id)
+      }
+      else if (e.event_name.includes('like')) category = 'likes'
+      else if (e.event_name.includes('comment')) category = 'comments'
 
       if (category) {
         if (eventDate >= todayStartDate) loopCounts[category].today++
@@ -286,6 +321,11 @@ export async function GET(request: Request) {
         loopCounts[category].month++
       }
     })
+
+    const loopUniqueViewers = loopViewers.size
+    const totalLoopsViewed = loopCounts.views.month
+    const uniqueLoops = new Set(loopData?.map(e => e.event_name) || []).size
+    const avgViewsPerLoop = totalLoopsViewed > 0 ? Math.round((totalLoopsViewed / Math.max(uniqueLoops, 1)) * 10) / 10 : 0
 
     return NextResponse.json({
       data: {
@@ -300,7 +340,15 @@ export async function GET(request: Request) {
       eventNames,
       keyEvents,
       engagement,
-      loops: loopCounts,
+      loops: {
+        views: loopCounts.views,
+        likes: loopCounts.likes,
+        comments: loopCounts.comments,
+        totalLoopsViewed,
+        uniqueViewers: loopUniqueViewers,
+        uniqueLoops,
+        avgViewsPerLoop,
+      },
     })
   } catch (error) {
     console.error('Error in analytics API:', error)

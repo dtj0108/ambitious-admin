@@ -13,7 +13,15 @@ import {
   Target,
   Sparkles,
 } from 'lucide-react'
-import { getKeyEventsMetrics, type KeyEventsMetrics, type AnalyticsFilters } from '@/lib/queries'
+
+interface KeyEventsMetrics {
+  impressionsToday: number
+  impressionsWeek: number
+  impressionsMonth: number
+  impressionsTrend: 'up' | 'down' | 'neutral'
+  trendPercentage: number
+  previousWeekImpressions: number
+}
 
 function formatNumber(num: number): string {
   if (num >= 1000000) {
@@ -51,9 +59,12 @@ export default function AdInventoryPage() {
     try {
       setLoading(true)
       setError(null)
-      const filters: AnalyticsFilters = { dateRange: '30d' }
-      const data = await getKeyEventsMetrics(filters)
-      setImpressions(data)
+      const res = await fetch('/api/admin/ad-inventory')
+      if (!res.ok) {
+        throw new Error('Failed to fetch data')
+      }
+      const data = await res.json()
+      setImpressions(data.metrics || null)
     } catch (err) {
       console.error('Failed to fetch impression data:', err)
       setError('Failed to load impression data. Please check your connection.')
