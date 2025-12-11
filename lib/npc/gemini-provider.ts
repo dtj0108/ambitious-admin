@@ -2,8 +2,9 @@ import type { VisualPersona } from '../queries-npc'
 
 export interface GeminiImageConfig {
   apiKey: string
-  // Valid Gemini models with image generation capability
-  model?: 'gemini-2.0-flash-exp' | 'imagen-3.0-generate-002'
+  // Nano Banana models for image generation
+  // See: https://ai.google.dev/gemini-api/docs/image-generation
+  model?: 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview'
 }
 
 export interface ImageGenerationRequest {
@@ -28,8 +29,8 @@ export class GeminiImageProvider {
 
   constructor(config: GeminiImageConfig) {
     this.apiKey = config.apiKey
-    // Use gemini-2.0-flash-exp which supports image generation
-    this.model = config.model || 'gemini-2.0-flash-exp'
+    // Default to Nano Banana Pro for best quality
+    this.model = config.model || 'gemini-3-pro-image-preview'
   }
 
   /**
@@ -69,9 +70,9 @@ export class GeminiImageProvider {
    * Generate an image from a text prompt
    */
   async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
-    const fullPrompt = 'Generate an image: ' + this.buildPromptWithPersona(request)
+    const fullPrompt = this.buildPromptWithPersona(request)
 
-    console.log('[GeminiImageProvider] Generating image with prompt:', fullPrompt.substring(0, 200) + '...')
+    console.log('[GeminiImageProvider] Generating image with Nano Banana Pro:', fullPrompt.substring(0, 200) + '...')
 
     const response = await fetch(
       `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`,
@@ -86,9 +87,6 @@ export class GeminiImageProvider {
               parts: [{ text: fullPrompt }],
             },
           ],
-          generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-          },
         }),
       }
     )
@@ -150,10 +148,7 @@ REALISM REQUIREMENTS (CRITICAL):
 
 ${scenePrompt}`
 
-    console.log('[GeminiImageProvider] Generating image with face-only reference')
-
-    // Prepend instruction to generate an image
-    const imagePrompt = 'Generate an image based on this description and reference photo: ' + fullPrompt
+    console.log('[GeminiImageProvider] Generating image with Nano Banana Pro + face reference')
 
     const response = await fetch(
       `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`,
@@ -166,7 +161,7 @@ ${scenePrompt}`
           contents: [
             {
               parts: [
-                { text: imagePrompt },
+                { text: fullPrompt },
                 {
                   inlineData: {
                     mimeType: referenceMimeType,
@@ -176,9 +171,6 @@ ${scenePrompt}`
               ],
             },
           ],
-          generationConfig: {
-            responseModalities: ['TEXT', 'IMAGE'],
-          },
         }),
       }
     )
@@ -209,7 +201,7 @@ ${scenePrompt}`
  * Create a Gemini image provider instance
  */
 export function createGeminiImageProvider(
-  model?: 'gemini-2.0-flash-exp' | 'imagen-3.0-generate-002'
+  model?: 'gemini-2.5-flash-image' | 'gemini-3-pro-image-preview'
 ): GeminiImageProvider {
   const apiKey = process.env.GEMINI_API_KEY
 
