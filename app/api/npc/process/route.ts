@@ -57,6 +57,7 @@ export async function POST(request: NextRequest) {
             user_id: item.npc_profile.user_id,
             content: item.content,
             post_type: item.post_type,
+            image_url: item.image_url,
           })
           .select('id')
           .single()
