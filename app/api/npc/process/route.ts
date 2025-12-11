@@ -299,7 +299,7 @@ async function processComments(
         engagementStyle: settings.engagement_style,
         postContent: post.content,
         postType: post.post_type,
-        postAuthor: (post.profiles as { username: string })?.username || 'user',
+        postAuthor: (Array.isArray(post.profiles) ? post.profiles[0]?.username : (post.profiles as { username: string } | null)?.username) || 'user',
       }
 
       const { content: commentContent } = await provider.generateComment(commentRequest)
