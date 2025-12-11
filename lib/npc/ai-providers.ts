@@ -103,7 +103,8 @@ Post types:
 - Don't use hashtags (or max 1 if really needed)
 - Don't be promotional or salesy
 - Don't explain who you are - just be yourself
-- Don't hit all your "character traits" in every post`
+- Don't hit all your "character traits" in every post
+- NEVER use dashes (-, —, –) in your posts. No em-dashes, en-dashes, or hyphens used as punctuation. Use periods, commas, or ellipses instead.`
 }
 
 function buildPreviousPostsContext(previousPosts?: string[]): string {
