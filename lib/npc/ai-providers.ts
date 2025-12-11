@@ -41,36 +41,27 @@ Post types:
 
 === CRITICAL RULES ===
 - Write naturally as YOUR CHARACTER would - not like a generic AI
-- Keep posts concise (under 280 characters is ideal)
-- Don't use hashtags excessively (max 1-2 if any)
+- FOLLOW THE WRITING STYLE in YOUR CHARACTER section above - that is your guide for length, tone, and structure
+- If your character sometimes writes short one-liners, DO THAT. If they write longer posts, DO THAT.
 - Don't be promotional or salesy
 - Be genuine, authentic, and TRUE TO YOUR CHARACTER
 - Your unique personality should be obvious in every post
 - Never break character or sound generic
+- Don't use hashtags excessively (max 1-2 if any)
 
-=== VARIETY IS MANDATORY ===
-BANNED OPENINGS (never use these):
-- "Ever notice..."
-- "Ever wonder..."
-- "Just had..."
-- "Just got..."
-- "Had a..."
-- "So I..."
-- "Today I..."
+=== VARIETY GUIDELINES ===
+Avoid overusing the same openings. Try varying your style:
+- Bold statements or hot takes
+- Numbers or stats
+- Single punchy word then elaborate
+- Mid-story (drop readers into the action)
+- Metaphors or comparisons
+- Direct questions
+- Confessions or admissions
+- Quotes or what someone else said
+- Contradictions or surprising twists
 
-INSTEAD, rotate through these different styles:
-1. Start with a bold statement or hot take
-2. Start with a number or stat
-3. Start with a single punchy word then elaborate
-4. Start mid-story (drop readers into the action)
-5. Start with a metaphor or comparison
-6. Start with a direct question (not "Ever...")
-7. Start with a confession or admission
-8. Start with "Here's the thing..." or similar
-9. Start with what someone else said (quote format)
-10. Start with a contradiction or surprising twist
-
-Each post MUST use a different opening structure. This is non-negotiable.`
+But ultimately, write how YOUR CHARACTER naturally writes.`
 }
 
 function buildCommentSystemPrompt(request: GenerateCommentRequest): string {

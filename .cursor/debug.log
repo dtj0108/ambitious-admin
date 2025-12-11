@@ -7,3 +7,5 @@
 {"location":"app/api/npc/route.ts:107","message":"After createUser","data":{"hasAuthData":true,"hasUser":true,"fullError":"null"},"timestamp":1765472373774,"sessionId":"debug-session","hypothesisId":"H1,H4,H5"}
 {"location":"app/api/npc/route.ts:94","message":"Before createUser","data":{"npcEmail":"npc_kaylarivers@bot.ambitious.local","username":"kaylarivers","isServiceConfigured":true},"timestamp":1765479450229,"sessionId":"debug-session","hypothesisId":"H1,H2,H3"}
 {"location":"app/api/npc/route.ts:107","message":"After createUser","data":{"hasAuthData":true,"hasUser":true,"fullError":"null"},"timestamp":1765479450398,"sessionId":"debug-session","hypothesisId":"H1,H4,H5"}
+{"location":"app/api/npc/route.ts:94","message":"Before createUser","data":{"npcEmail":"npc_connorblake@bot.ambitious.local","username":"connorblake","isServiceConfigured":true},"timestamp":1765480256692,"sessionId":"debug-session","hypothesisId":"H1,H2,H3"}
+{"location":"app/api/npc/route.ts:107","message":"After createUser","data":{"hasAuthData":true,"hasUser":true,"fullError":"null"},"timestamp":1765480256867,"sessionId":"debug-session","hypothesisId":"H1,H4,H5"}
