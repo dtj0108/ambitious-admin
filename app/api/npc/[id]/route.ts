@@ -99,6 +99,8 @@ export async function PATCH(
     if (body.custom_cron !== undefined) updateData.custom_cron = body.custom_cron
     if (body.engagement_settings !== undefined) updateData.engagement_settings = body.engagement_settings
     if (body.is_active !== undefined) updateData.is_active = body.is_active
+    // NPC type
+    if (body.npc_type !== undefined) updateData.npc_type = body.npc_type
     // Image generation settings
     if (body.generate_images !== undefined) updateData.generate_images = body.generate_images
     if (body.image_frequency !== undefined) updateData.image_frequency = body.image_frequency

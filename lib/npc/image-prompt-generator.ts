@@ -240,6 +240,7 @@ export interface ImagePromptRequest {
   preferredStyle: ImageStyle
   aiModel: AIModel
   temperature?: number
+  isObjectNpc?: boolean // If true, generate object/product images, not person images
 }
 
 export interface ImagePromptResponse {
@@ -255,9 +256,20 @@ export async function generateImagePrompt(
   request: ImagePromptRequest
 ): Promise<ImagePromptResponse> {
   const provider = createAIProvider(request.aiModel, { temperature: request.temperature || 0.7 })
+  const isObject = request.isObjectNpc ?? false
 
+  // Different context for person vs object NPCs
   const visualPersonaContext = request.visualPersona
-    ? `
+    ? isObject
+      ? `
+The object/product style:
+- Appearance: ${request.visualPersona.appearance}
+- Style: ${request.visualPersona.style}
+- Presentation: ${request.visualPersona.clothing}
+- Setting: ${request.visualPersona.environment}
+- Photography style: ${request.visualPersona.photography_style}
+`
+      : `
 The character's visual appearance:
 - Appearance: ${request.visualPersona.appearance}
 - Style: ${request.visualPersona.style}
@@ -267,23 +279,33 @@ The character's visual appearance:
 `
     : ''
 
+  const objectRules = `Rules:
+1. Create an image of the OBJECT/PRODUCT only - NO people or characters
+2. Focus on beautiful product/food/object photography
+3. Use appealing composition, lighting, and styling
+4. The object should be the hero of the image
+5. Keep the prompt concise but detailed (50-100 words)`
+
+  const personRules = `Rules:
+1. The image should complement the post content, not just illustrate it literally
+2. If the post is personal or about the character's experience, include the character in the scene
+3. If the post is about a general concept or advice, you can create an abstract or symbolic image
+4. Be specific about lighting, composition, and mood
+5. Keep the prompt concise but detailed (50-100 words)`
+
   const systemPrompt = `You are an expert at creating image prompts for AI image generation.
 Your task is to create a detailed image prompt that will accompany a social media post.
+${isObject ? 'This is for an OBJECT/PRODUCT account - DO NOT include any people.' : ''}
 
 ${visualPersonaContext}
 
 Style preference: ${request.preferredStyle === 'photo' ? 'Photorealistic photography' : request.preferredStyle === 'illustration' ? 'Digital illustration' : 'Either photo or illustration'}
 
-Rules:
-1. The image should complement the post content, not just illustrate it literally
-2. If the post is personal or about the character's experience, include the character in the scene
-3. If the post is about a general concept or advice, you can create an abstract or symbolic image
-4. Be specific about lighting, composition, and mood
-5. Keep the prompt concise but detailed (50-100 words)
+${isObject ? objectRules : personRules}
 
 Respond with ONLY a JSON object in this exact format:
 {
-  "shouldIncludeCharacter": true/false,
+  "shouldIncludeCharacter": ${isObject ? 'false' : 'true/false'},
   "sceneDescription": "Brief description of what the scene shows",
   "prompt": "The full detailed image prompt"
 }`
@@ -292,6 +314,7 @@ Respond with ONLY a JSON object in this exact format:
 
 "${request.postContent}"
 
+${isObject ? 'Remember: This is an OBJECT account. Generate an image of the product/object only, NO people.' : ''}
 Remember to respond with ONLY valid JSON.`
 
   try {
@@ -344,49 +367,81 @@ Remember to respond with ONLY valid JSON.`
 export function buildCompleteImagePrompt(
   generatedPrompt: ImagePromptResponse,
   visualPersona: VisualPersona | null,
-  preferredStyle: ImageStyle
+  preferredStyle: ImageStyle,
+  isObjectNpc: boolean = false
 ): string {
   const parts: string[] = []
 
-  // Style instruction with emphasis on dynamic, natural moments
-  if (preferredStyle === 'photo') {
-    parts.push('Create a photorealistic candid photograph - capture a natural, in-the-moment scene. Use professional photography quality with dynamic composition.')
-  } else if (preferredStyle === 'illustration') {
-    parts.push('Create a dynamic digital illustration showing the character in action, with expressive poses and engaging composition.')
-  } else {
-    parts.push('Create a high-quality, dynamic image capturing a natural moment in this person\'s life.')
-  }
+  if (isObjectNpc) {
+    // Object/Product NPC prompts
+    if (preferredStyle === 'photo') {
+      parts.push('Create a stunning product/food photography image. Professional quality, beautiful lighting, appetizing/appealing presentation.')
+    } else if (preferredStyle === 'illustration') {
+      parts.push('Create a beautiful digital illustration of the object/product. Clean, modern, visually striking.')
+    } else {
+      parts.push('Create a high-quality, visually appealing image of this object/product.')
+    }
 
-  parts.push('')
-  parts.push('KEY REQUIREMENTS:')
-  parts.push('1. Show this person actively engaged in the scene - NOT a static portrait')
-  parts.push('2. REALISTIC PHYSICS: Feet on ground, proper weight distribution, no floating or levitating')
-  parts.push('3. ANATOMICALLY CORRECT: Natural proportions, proper joint positions, realistic hands')
-  parts.push('4. GROUNDED: Believable scene with coherent environment and natural lighting')
-  parts.push('')
-
-  // Character description if needed
-  if (generatedPrompt.shouldIncludeCharacter && visualPersona) {
-    parts.push('THE PERSON (keep their identity but show them in a NEW situation):')
-    parts.push(`- Physical: ${visualPersona.appearance}`)
-    parts.push(`- Clothing style (adapt to scene): ${visualPersona.clothing}`)
-    parts.push(`- Their vibe: ${visualPersona.style}`)
     parts.push('')
+    parts.push('KEY REQUIREMENTS:')
+    parts.push('1. NO PEOPLE in the image - focus entirely on the object/product')
+    parts.push('2. Beautiful composition and styling')
+    parts.push('3. Appetizing/appealing presentation')
+    parts.push('4. Professional product photography quality')
+    parts.push('')
+
+    // Object styling if available
+    if (visualPersona) {
+      parts.push('OBJECT/PRODUCT STYLE:')
+      if (visualPersona.appearance) parts.push(`- Type: ${visualPersona.appearance}`)
+      if (visualPersona.style) parts.push(`- Style: ${visualPersona.style}`)
+      if (visualPersona.clothing) parts.push(`- Presentation: ${visualPersona.clothing}`)
+      parts.push('')
+    }
+
+    parts.push('THE SCENE:')
+    parts.push(generatedPrompt.prompt)
+
+  } else {
+    // Person NPC prompts (original logic)
+    if (preferredStyle === 'photo') {
+      parts.push('Create a photorealistic candid photograph - capture a natural, in-the-moment scene. Use professional photography quality with dynamic composition.')
+    } else if (preferredStyle === 'illustration') {
+      parts.push('Create a dynamic digital illustration showing the character in action, with expressive poses and engaging composition.')
+    } else {
+      parts.push('Create a high-quality, dynamic image capturing a natural moment in this person\'s life.')
+    }
+
+    parts.push('')
+    parts.push('KEY REQUIREMENTS:')
+    parts.push('1. Show this person actively engaged in the scene - NOT a static portrait')
+    parts.push('2. REALISTIC PHYSICS: Feet on ground, proper weight distribution, no floating or levitating')
+    parts.push('3. ANATOMICALLY CORRECT: Natural proportions, proper joint positions, realistic hands')
+    parts.push('4. GROUNDED: Believable scene with coherent environment and natural lighting')
+    parts.push('')
+
+    // Character description if needed
+    if (generatedPrompt.shouldIncludeCharacter && visualPersona) {
+      parts.push('THE PERSON (keep their identity but show them in a NEW situation):')
+      parts.push(`- Physical: ${visualPersona.appearance}`)
+      parts.push(`- Clothing style (adapt to scene): ${visualPersona.clothing}`)
+      parts.push(`- Their vibe: ${visualPersona.style}`)
+      parts.push('')
+    }
+
+    parts.push('THE SCENE (create this as a new, unique moment):')
+    parts.push(generatedPrompt.prompt)
+    parts.push('')
+    parts.push('Make it feel like a snapshot from their real life - natural, spontaneous, and full of personality.')
   }
 
-  // Scene - the main focus
-  parts.push('THE SCENE (create this as a new, unique moment):')
-  parts.push(generatedPrompt.prompt)
-  parts.push('')
-  parts.push('Make it feel like a snapshot from their real life - natural, spontaneous, and full of personality.')
-
-  // Environment hints
+  // Environment hints (both types)
   if (visualPersona?.environment) {
     parts.push('')
-    parts.push(`Typical settings for this person: ${visualPersona.environment}`)
+    parts.push(`Setting: ${visualPersona.environment}`)
   }
 
-  // Photography style
+  // Photography style (both types)
   if (visualPersona?.photography_style) {
     parts.push('')
     parts.push(`Photography style: ${visualPersona.photography_style}`)

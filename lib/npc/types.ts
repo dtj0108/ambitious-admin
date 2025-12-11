@@ -1,7 +1,7 @@
-import type { PostType, Tone, EngagementStyle, ScheduleMode, PostingTimes, ActiveHours, VisualPersona, ImageFrequency, ImageStyle } from '../queries-npc'
+import type { PostType, Tone, EngagementStyle, ScheduleMode, PostingTimes, ActiveHours, VisualPersona, ImageFrequency, ImageStyle, NpcType } from '../queries-npc'
 
 // Re-export schedule types
-export type { ScheduleMode, PostingTimes, ActiveHours, VisualPersona, ImageFrequency, ImageStyle }
+export type { ScheduleMode, PostingTimes, ActiveHours, VisualPersona, ImageFrequency, ImageStyle, NpcType }
 
 // =====================================================
 // AI Provider Types
@@ -75,6 +75,8 @@ export interface ContentGenerationOptions {
   preferredImageStyle?: ImageStyle
   visualPersona?: VisualPersona | null
   referenceImageUrl?: string | null // Reference image for character consistency (defaults to avatar)
+  // NPC type: person vs object (affects image generation)
+  npcType?: NpcType
 }
 
 export interface ScheduledPost {

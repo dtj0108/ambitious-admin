@@ -215,6 +215,8 @@ export async function POST(request: NextRequest) {
       custom_cron: body.custom_cron || null,
       engagement_settings: { ...defaultEngagementSettings, ...body.engagement_settings },
       is_active: body.is_active ?? true,
+      // NPC type
+      npc_type: body.npc_type || 'person',
       // Image generation settings
       generate_images: body.generate_images ?? false,
       image_frequency: body.image_frequency || 'sometimes',

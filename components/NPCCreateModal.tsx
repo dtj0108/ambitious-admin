@@ -16,6 +16,7 @@ import type {
   VisualPersona,
   ImageFrequency,
   ImageStyle,
+  NpcType,
 } from '@/lib/queries-npc'
 import { PROFILE_TAG_CATEGORIES, searchTags } from '@/lib/profileTags'
 
@@ -92,6 +93,7 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
   const [temperature, setTemperature] = useState(0.8) // AI creativity (0.0-1.0)
   const [personaName, setPersonaName] = useState('')
   const [personaPrompt, setPersonaPrompt] = useState('')
+  const [npcType, setNpcType] = useState<NpcType>('person')
   
   // Step 3: Content Config
   const [tone, setTone] = useState<Tone>('casual')
@@ -175,6 +177,9 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
       setCommentsPerDay(editNPC.engagement_settings?.comments_per_day ?? 5)
       setCommentOnTypes(editNPC.engagement_settings?.comment_on_types || ['win', 'dream'])
       setEngagementStyle(editNPC.engagement_settings?.engagement_style || 'supportive')
+      
+      // Load NPC type
+      setNpcType(editNPC.npc_type ?? 'person')
       
       // Load image generation settings
       setGenerateImages(editNPC.generate_images ?? false)
@@ -443,6 +448,8 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
           post_types: postTypes,
           posting_times: postingTimes,
           engagement_settings: engagementSettings,
+          // NPC type
+          npc_type: npcType,
           // Image generation settings
           generate_images: generateImages,
           image_frequency: imageFrequency,
@@ -489,6 +496,8 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
           post_types: postTypes,
           posting_times: postingTimes,
           engagement_settings: engagementSettings,
+          // NPC type
+          npc_type: npcType,
           // Image generation settings
           generate_images: generateImages,
           image_frequency: imageFrequency,
@@ -552,6 +561,7 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
     setCommentsPerDay(5)
     setCommentOnTypes(['win', 'dream'])
     setEngagementStyle('supportive')
+    setNpcType('person')
     setGenerateImages(false)
     setImageFrequency('sometimes')
     setPreferredImageStyle('photo')
@@ -1152,6 +1162,50 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
             <div className="space-y-6">
               <div>
                 <h3 className="text-lg font-semibold text-text mb-4">AI & Persona</h3>
+                
+                {/* NPC Type */}
+                <div className="mb-6">
+                  <label className="block text-sm font-medium text-text mb-3">
+                    NPC Type
+                  </label>
+                  <p className="text-xs text-text-secondary mb-3">
+                    Is this NPC a person or an object/brand account?
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      onClick={() => setNpcType('person')}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        npcType === 'person'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <User size={24} className="text-primary" />
+                        <div className="text-left">
+                          <p className="font-medium text-text">Person</p>
+                          <p className="text-xs text-text-secondary">Human character with face</p>
+                        </div>
+                      </div>
+                    </button>
+                    <button
+                      onClick={() => setNpcType('object')}
+                      className={`p-4 rounded-xl border-2 transition-all ${
+                        npcType === 'object'
+                          ? 'border-primary bg-primary/10'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className="flex items-center gap-3">
+                        <Image size={24} className="text-primary" />
+                        <div className="text-left">
+                          <p className="font-medium text-text">Object/Brand</p>
+                          <p className="text-xs text-text-secondary">Product, food, thing (no face)</p>
+                        </div>
+                      </div>
+                    </button>
+                  </div>
+                </div>
                 
                 {/* AI Model */}
                 <div className="mb-6">
@@ -1779,10 +1833,15 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                       
                       <div className="space-y-4 p-4 bg-elevated rounded-xl">
                         <div>
-                          <label className="block text-xs text-text-secondary mb-1">Appearance</label>
+                          <label className="block text-xs text-text-secondary mb-1">
+                            {npcType === 'object' ? 'Object/Product Type' : 'Appearance'}
+                          </label>
                           <input
                             type="text"
-                            placeholder="e.g., 30s professional woman, warm brown skin, short natural curly hair"
+                            placeholder={npcType === 'object' 
+                              ? "e.g., artisan sushi rolls, fresh ingredients, vibrant colors"
+                              : "e.g., 30s professional woman, warm brown skin, short natural curly hair"
+                            }
                             value={visualPersona.appearance}
                             onChange={(e) => setVisualPersona({ ...visualPersona, appearance: e.target.value })}
                             className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
@@ -1792,27 +1851,40 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                           <label className="block text-xs text-text-secondary mb-1">Style</label>
                           <input
                             type="text"
-                            placeholder="e.g., clean, modern, minimalist aesthetic"
+                            placeholder={npcType === 'object'
+                              ? "e.g., Japanese minimalist, elegant plating, zen aesthetic"
+                              : "e.g., clean, modern, minimalist aesthetic"
+                            }
                             value={visualPersona.style}
                             onChange={(e) => setVisualPersona({ ...visualPersona, style: e.target.value })}
                             className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-text-secondary mb-1">Clothing</label>
+                          <label className="block text-xs text-text-secondary mb-1">
+                            {npcType === 'object' ? 'Presentation' : 'Clothing'}
+                          </label>
                           <input
                             type="text"
-                            placeholder="e.g., usually wears blazers, neutral tones, subtle gold jewelry"
+                            placeholder={npcType === 'object'
+                              ? "e.g., served on slate plates, bamboo accents, wasabi garnish"
+                              : "e.g., usually wears blazers, neutral tones, subtle gold jewelry"
+                            }
                             value={visualPersona.clothing}
                             onChange={(e) => setVisualPersona({ ...visualPersona, clothing: e.target.value })}
                             className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
                           />
                         </div>
                         <div>
-                          <label className="block text-xs text-text-secondary mb-1">Environment</label>
+                          <label className="block text-xs text-text-secondary mb-1">
+                            {npcType === 'object' ? 'Setting' : 'Environment'}
+                          </label>
                           <input
                             type="text"
-                            placeholder="e.g., modern office spaces, coffee shops, urban settings"
+                            placeholder={npcType === 'object'
+                              ? "e.g., traditional sushi bar, dark wood counter, moody lighting"
+                              : "e.g., modern office spaces, coffee shops, urban settings"
+                            }
                             value={visualPersona.environment}
                             onChange={(e) => setVisualPersona({ ...visualPersona, environment: e.target.value })}
                             className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
@@ -1822,7 +1894,10 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                           <label className="block text-xs text-text-secondary mb-1">Photography Style</label>
                           <input
                             type="text"
-                            placeholder="e.g., candid, natural lighting, shallow depth of field"
+                            placeholder={npcType === 'object'
+                              ? "e.g., food photography, overhead shots, macro details, appetizing"
+                              : "e.g., candid, natural lighting, shallow depth of field"
+                            }
                             value={visualPersona.photography_style}
                             onChange={(e) => setVisualPersona({ ...visualPersona, photography_style: e.target.value })}
                             className="w-full h-10 px-3 bg-surface border border-border rounded-lg text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary"
@@ -1831,8 +1906,8 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                       </div>
                     </div>
 
-                    {/* Reference Image URL */}
-                    {/* Reference Image */}
+                    {/* Reference Image - Only for Person NPCs */}
+                    {npcType === 'person' && (
                     <div className="p-4 bg-elevated rounded-xl">
                       <div className="flex items-center justify-between mb-3">
                         <div>
@@ -1840,7 +1915,7 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                             Reference Image
                           </label>
                           <p className="text-xs text-text-secondary">
-                            Used for character consistency across generated images
+                            Used for character face consistency across generated images
                           </p>
                         </div>
                         {isEditMode && (
@@ -1905,6 +1980,7 @@ Topics you care about: bootstrapping, product-market fit, mental health for foun
                         </div>
                       )}
                     </div>
+                    )}
                   </>
                 )}
               </div>

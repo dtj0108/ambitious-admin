@@ -71,6 +71,7 @@ export interface VisualPersona {
 
 export type ImageFrequency = 'always' | 'sometimes' | 'rarely'
 export type ImageStyle = 'photo' | 'illustration' | 'mixed'
+export type NpcType = 'person' | 'object'
 
 export interface NPCProfile {
   id: string
@@ -102,6 +103,8 @@ export interface NPCProfile {
   generate_images: boolean
   image_frequency: ImageFrequency
   preferred_image_style: ImageStyle
+  // NPC type: person (human character) or object (product/brand/thing)
+  npc_type: NpcType
   // Joined profile data
   profile?: {
     username: string
@@ -185,6 +188,8 @@ export interface UpdateNPCData {
   preferred_image_style?: ImageStyle
   visual_persona?: VisualPersona | null
   reference_image_url?: string | null
+  // NPC type
+  npc_type?: NpcType
 }
 
 export interface NPCListOptions {

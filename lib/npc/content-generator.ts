@@ -51,21 +51,24 @@ export class ContentGenerator {
       preferredImageStyle = 'photo',
       visualPersona = null,
       referenceImageUrl = null,
+      npcType = 'person',
     } = options
 
     const provider = createAIProvider(aiModel, { temperature })
     const generatedPosts: ScheduledPost[] = []
+    const isObjectNpc = npcType === 'object'
     
     // Fetch recent posts from the database to avoid repetition across sessions
     const historicalPosts = await getRecentNPCPosts(npcId, 15)
     const previousContents: string[] = [...historicalPosts]
     
     console.log(`[ContentGenerator] Loaded ${historicalPosts.length} historical posts for context`)
+    console.log(`[ContentGenerator] NPC type: ${npcType}`)
     
-    // Pre-fetch reference image for character consistency (if available)
+    // Pre-fetch reference image for character consistency (only for person NPCs)
     let referenceImageData: { data: string; mimeType: string } | null = null
-    if (referenceImageUrl && generateImages) {
-      console.log(`[ContentGenerator] Fetching reference image for consistency: ${referenceImageUrl}`)
+    if (referenceImageUrl && generateImages && !isObjectNpc) {
+      console.log(`[ContentGenerator] Fetching reference image for person consistency: ${referenceImageUrl}`)
       referenceImageData = await fetchImageAsBase64(referenceImageUrl)
       if (referenceImageData) {
         console.log('[ContentGenerator] Reference image loaded successfully')
@@ -121,13 +124,15 @@ export class ContentGenerator {
               preferredStyle: preferredImageStyle,
               aiModel,
               temperature,
+              isObjectNpc,
             })
 
             // Step 2: Build complete prompt with visual persona
             const completePrompt = buildCompleteImagePrompt(
               promptResult,
               visualPersona,
-              preferredImageStyle
+              preferredImageStyle,
+              isObjectNpc
             )
             imagePrompt = completePrompt
 
@@ -256,8 +261,9 @@ export class ContentGenerator {
       imageFrequency: npc.image_frequency,
       preferredImageStyle: npc.preferred_image_style,
       visualPersona: npc.visual_persona,
-      // Use reference_image_url if set, otherwise fall back to avatar for character consistency
-      referenceImageUrl: npc.reference_image_url || npc.profile?.avatar_url || null,
+      // Use reference_image_url if set, otherwise fall back to avatar for character consistency (person NPCs only)
+      referenceImageUrl: npc.npc_type === 'object' ? null : (npc.reference_image_url || npc.profile?.avatar_url || null),
+      npcType: npc.npc_type || 'person',
     })
   }
 
