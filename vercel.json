@@ -1,0 +1,9 @@
+{
+  "crons": [
+    {
+      "path": "/api/npc/process",
+      "schedule": "* * * * *"
+    }
+  ]
+}
+

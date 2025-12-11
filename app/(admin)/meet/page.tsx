@@ -7,10 +7,6 @@ import {
   Filter, X, ChevronDown, ChevronUp, Percent, User, ArrowRight
 } from 'lucide-react'
 import {
-  getMeetStats,
-  getMeetRequests,
-  getMeetRequestById,
-  getSwipeActivityTrend,
   type MeetStats,
   type MeetRequestWithUsers,
   type MeetRequestStatus,
@@ -51,31 +47,31 @@ export default function MeetPage() {
   const [selectedRequest, setSelectedRequest] = useState<MeetRequestWithUsers | null>(null)
   const [modalOpen, setModalOpen] = useState(false)
 
-  // Fetch stats and swipe trend
-  useEffect(() => {
-    async function fetchData() {
-      const [statsData, trendData] = await Promise.all([
-        getMeetStats(),
-        getSwipeActivityTrend(7),
-      ])
-      setStats(statsData)
-      setSwipeTrend(trendData)
-    }
-    fetchData()
-  }, [])
+  // Fetch stats and swipe trend (stats are included in the meet API response)
+  // Stats will be set when fetching requests
 
   // Fetch requests
   const fetchRequests = useCallback(async () => {
     setLoading(true)
-    const result = await getMeetRequests({
-      page,
-      limit,
-      status: statusFilter,
-      dateRange,
-    })
-    setRequests(result.requests)
-    setTotalPages(result.totalPages)
-    setTotal(result.total)
+    try {
+      const params = new URLSearchParams()
+      params.set('page', page.toString())
+      params.set('limit', limit.toString())
+      if (statusFilter !== 'all') params.set('status', statusFilter)
+      params.set('dateRange', dateRange)
+      
+      const response = await fetch(`/api/admin/meet?${params.toString()}`)
+      if (response.ok) {
+        const result = await response.json()
+        setStats(result.stats)
+        setSwipeTrend(result.swipeTrend)
+        setRequests(result.requests)
+        setTotalPages(result.totalPages)
+        setTotal(result.total)
+      }
+    } catch (error) {
+      console.error('Failed to fetch meet data:', error)
+    }
     setLoading(false)
   }, [page, limit, statusFilter, dateRange])
 
@@ -90,11 +86,9 @@ export default function MeetPage() {
 
   // Open modal
   const handleViewRequest = async (request: MeetRequestWithUsers) => {
-    const fullRequest = await getMeetRequestById(request.id)
-    if (fullRequest) {
-      setSelectedRequest(fullRequest)
-      setModalOpen(true)
-    }
+    // Use the request data we already have since full data is included in list
+    setSelectedRequest(request)
+    setModalOpen(true)
   }
 
   // Clear filters
