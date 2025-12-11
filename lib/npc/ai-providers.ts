@@ -64,6 +64,21 @@ Avoid overusing the same openings. Try varying your style:
 But ultimately, write how YOUR CHARACTER naturally writes.`
 }
 
+function buildPreviousPostsContext(previousPosts?: string[]): string {
+  if (!previousPosts?.length) return ''
+  
+  return `\n\n=== FEEL ALIVE - BE DIFFERENT ===
+Your recent posts (DO NOT copy their structure, length, themes, or patterns):
+${previousPosts.slice(0, 5).map((p, i) => `${i + 1}. "${p.substring(0, 80)}${p.length > 80 ? '...' : ''}"`).join('\n')}
+
+THIS POST MUST BE COMPLETELY DIFFERENT:
+- Different LENGTH (long posts recently? try a punchy one-liner. Short recently? try something more expansive)
+- Different TOPIC/THEME (don't repeat the same subjects)
+- Different MOOD (if recent posts were frustrated, try hopeful or curious)
+- Different STRUCTURE (if recent posts told stories, try a direct statement or question)
+- Show a different facet of your personality - you're a multi-dimensional person!`
+}
+
 function buildCommentSystemPrompt(request: GenerateCommentRequest): string {
   const characterContext = request.personaPrompt 
     ? request.personaPrompt 
@@ -197,9 +212,7 @@ export class OpenAIProvider implements AIProvider {
   }
 
   private buildPostPrompt(request: GeneratePostRequest): string {
-    const previousPostsContext = request.previousPosts?.length
-      ? `\n\nIMPORTANT: Do NOT start your post the same way as these recent posts. Use a completely different opening structure:\n${request.previousPosts.slice(0, 3).join('\n')}`
-      : ''
+    const previousPostsContext = buildPreviousPostsContext(request.previousPosts)
 
     // If using persona prompt, topics are included in the system prompt
     if (request.personaPrompt) {
@@ -349,9 +362,7 @@ export class ClaudeProvider implements AIProvider {
   }
 
   private buildPostPrompt(request: GeneratePostRequest): string {
-    const previousPostsContext = request.previousPosts?.length
-      ? `\n\nIMPORTANT: Do NOT start your post the same way as these recent posts. Use a completely different opening structure:\n${request.previousPosts.slice(0, 3).join('\n')}`
-      : ''
+    const previousPostsContext = buildPreviousPostsContext(request.previousPosts)
 
     // If using persona prompt, topics are included in the system prompt
     if (request.personaPrompt) {
@@ -507,9 +518,7 @@ export class XAIProvider implements AIProvider {
   }
 
   private buildPostPrompt(request: GeneratePostRequest): string {
-    const previousPostsContext = request.previousPosts?.length
-      ? `\n\nIMPORTANT: Do NOT start your post the same way as these recent posts. Use a completely different opening structure:\n${request.previousPosts.slice(0, 3).join('\n')}`
-      : ''
+    const previousPostsContext = buildPreviousPostsContext(request.previousPosts)
 
     if (request.personaPrompt) {
       return `Write a ${request.postType} post.
