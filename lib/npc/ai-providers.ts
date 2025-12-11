@@ -68,15 +68,15 @@ function buildPreviousPostsContext(previousPosts?: string[]): string {
   if (!previousPosts?.length) return ''
   
   return `\n\n=== FEEL ALIVE - BE DIFFERENT ===
-Your recent posts (DO NOT copy their structure, length, themes, or patterns):
+Your recent posts (DO NOT copy their structure, length, or patterns):
 ${previousPosts.slice(0, 5).map((p, i) => `${i + 1}. "${p.substring(0, 80)}${p.length > 80 ? '...' : ''}"`).join('\n')}
 
-THIS POST MUST BE COMPLETELY DIFFERENT:
-- Different LENGTH (long posts recently? try a punchy one-liner. Short recently? try something more expansive)
-- Different TOPIC/THEME (don't repeat the same subjects)
-- Different MOOD (if recent posts were frustrated, try hopeful or curious)
-- Different STRUCTURE (if recent posts told stories, try a direct statement or question)
-- Show a different facet of your personality - you're a multi-dimensional person!`
+STAY WITHIN YOUR PERSONA - but make this post feel fresh:
+- Different LENGTH (long recently? try a punchy one-liner. Short? try longer)
+- Different MOOD (frustrated recently? try excited, curious, or reflective)
+- Different STRUCTURE (stories recently? try a hot take, question, or observation)
+- Different ANGLE on your world (explore a different facet of who you are)
+- You're a real person with range - show it!`
 }
 
 function buildCommentSystemPrompt(request: GenerateCommentRequest): string {
