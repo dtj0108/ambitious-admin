@@ -15,6 +15,7 @@ const publicPaths = [
   '/api/auth/verify-totp',
   '/api/auth/claim',
   '/api/auth/set-password',
+  '/api/npc/process', // Cron job endpoint (protected by CRON_SECRET)
 ]
 
 export async function middleware(request: NextRequest) {
