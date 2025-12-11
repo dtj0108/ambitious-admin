@@ -229,7 +229,7 @@ export class BehaviorEngine {
           postId: post.id,
           postContent: post.content,
           postType: post.post_type as PostType,
-          authorUsername: (post.profiles as { username: string })?.username || 'user',
+          authorUsername: (Array.isArray(post.profiles) ? post.profiles[0]?.username : (post.profiles as { username: string } | null)?.username) || 'user',
           authorId: post.user_id,
         })
       }
@@ -286,7 +286,7 @@ export class BehaviorEngine {
           postId: post.id,
           postContent: post.content,
           postType: post.post_type as PostType,
-          authorUsername: (post.profiles as { username: string })?.username || 'user',
+          authorUsername: (Array.isArray(post.profiles) ? post.profiles[0]?.username : (post.profiles as { username: string } | null)?.username) || 'user',
           authorId: post.user_id,
         })
       }
