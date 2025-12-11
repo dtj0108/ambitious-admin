@@ -2,7 +2,8 @@ import type { VisualPersona } from '../queries-npc'
 
 export interface GeminiImageConfig {
   apiKey: string
-  model?: 'gemini-2.5-flash-image' | 'gemini-3-pro-image'
+  // Valid Gemini models with image generation capability
+  model?: 'gemini-2.0-flash-exp' | 'imagen-3.0-generate-002'
 }
 
 export interface ImageGenerationRequest {
@@ -27,7 +28,8 @@ export class GeminiImageProvider {
 
   constructor(config: GeminiImageConfig) {
     this.apiKey = config.apiKey
-    this.model = config.model || 'gemini-2.5-flash-image'
+    // Use gemini-2.0-flash-exp which supports image generation
+    this.model = config.model || 'gemini-2.0-flash-exp'
   }
 
   /**
@@ -67,7 +69,7 @@ export class GeminiImageProvider {
    * Generate an image from a text prompt
    */
   async generateImage(request: ImageGenerationRequest): Promise<ImageGenerationResponse> {
-    const fullPrompt = this.buildPromptWithPersona(request)
+    const fullPrompt = 'Generate an image: ' + this.buildPromptWithPersona(request)
 
     console.log('[GeminiImageProvider] Generating image with prompt:', fullPrompt.substring(0, 200) + '...')
 
@@ -84,6 +86,9 @@ export class GeminiImageProvider {
               parts: [{ text: fullPrompt }],
             },
           ],
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
+          },
         }),
       }
     )
@@ -147,6 +152,9 @@ ${scenePrompt}`
 
     console.log('[GeminiImageProvider] Generating image with face-only reference')
 
+    // Prepend instruction to generate an image
+    const imagePrompt = 'Generate an image based on this description and reference photo: ' + fullPrompt
+
     const response = await fetch(
       `${this.baseUrl}/${this.model}:generateContent?key=${this.apiKey}`,
       {
@@ -158,7 +166,7 @@ ${scenePrompt}`
           contents: [
             {
               parts: [
-                { text: fullPrompt },
+                { text: imagePrompt },
                 {
                   inlineData: {
                     mimeType: referenceMimeType,
@@ -168,6 +176,9 @@ ${scenePrompt}`
               ],
             },
           ],
+          generationConfig: {
+            responseModalities: ['TEXT', 'IMAGE'],
+          },
         }),
       }
     )
@@ -198,7 +209,7 @@ ${scenePrompt}`
  * Create a Gemini image provider instance
  */
 export function createGeminiImageProvider(
-  model?: 'gemini-2.5-flash-image' | 'gemini-3-pro-image'
+  model?: 'gemini-2.0-flash-exp' | 'imagen-3.0-generate-002'
 ): GeminiImageProvider {
   const apiKey = process.env.GEMINI_API_KEY
 
