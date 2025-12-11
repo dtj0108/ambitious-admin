@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { generateVisualPersonaFromText, buildReferenceImagePrompt } from '@/lib/npc/image-prompt-generator'
+import { generateVisualPersonaFromText, buildReferenceImagePrompt, generateCompleteNPC } from '@/lib/npc/image-prompt-generator'
 import { createGeminiImageProvider, isGeminiConfigured } from '@/lib/npc/gemini-provider'
 import { uploadNPCImage } from '@/lib/npc/image-storage'
 import { supabaseAdmin, isServiceRoleConfigured } from '@/lib/supabase'
@@ -8,7 +8,24 @@ import type { AIModel, VisualPersona } from '@/lib/queries-npc'
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json()
-    const { action, npc_id, persona_name, persona_prompt, ai_model, visual_persona } = body
+    const { action, npc_id, persona_name, persona_prompt, ai_model, visual_persona, description } = body
+
+    if (action === 'generate_complete_npc') {
+      // Generate a complete NPC from a free-text description
+      if (!description || description.trim().length < 10) {
+        return NextResponse.json(
+          { error: 'Please provide a description of at least 10 characters' },
+          { status: 400 }
+        )
+      }
+
+      const npcData = await generateCompleteNPC({
+        description: description.trim(),
+        aiModel: (ai_model as AIModel) || 'openai',
+      })
+
+      return NextResponse.json({ npc: npcData })
+    }
 
     if (action === 'generate_visual_persona') {
       // Generate visual persona from text persona using AI
@@ -83,7 +100,7 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { error: 'Invalid action. Use "generate_visual_persona" or "generate_reference_image"' },
+      { error: 'Invalid action. Use "generate_complete_npc", "generate_visual_persona", or "generate_reference_image"' },
       { status: 400 }
     )
   } catch (error) {

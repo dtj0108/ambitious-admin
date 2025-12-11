@@ -131,6 +131,10 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
   const [generatingVisualPersona, setGeneratingVisualPersona] = useState(false)
   const [generatingReferenceImage, setGeneratingReferenceImage] = useState(false)
   
+  // Quick create with AI
+  const [quickCreateDescription, setQuickCreateDescription] = useState('')
+  const [generatingNPC, setGeneratingNPC] = useState(false)
+  
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [usernameError, setUsernameError] = useState<string | null>(null)
@@ -561,6 +565,8 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
     setReferenceImageUrl('')
     setGeneratingVisualPersona(false)
     setGeneratingReferenceImage(false)
+    setQuickCreateDescription('')
+    setGeneratingNPC(false)
     setError(null)
     setUsernameError(null)
     onClose()
@@ -600,6 +606,55 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
       setError(error instanceof Error ? error.message : 'Failed to generate visual persona')
     } finally {
       setGeneratingVisualPersona(false)
+    }
+  }
+
+  const handleGenerateCompleteNPC = async () => {
+    if (!quickCreateDescription.trim() || quickCreateDescription.length < 10) {
+      setError('Please provide a description of at least 10 characters')
+      return
+    }
+
+    setGeneratingNPC(true)
+    setError(null)
+
+    try {
+      const response = await fetch('/api/npc/generate-visual', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'generate_complete_npc',
+          description: quickCreateDescription,
+          ai_model: aiModel,
+        }),
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to generate NPC')
+      }
+
+      if (data.npc) {
+        const npc = data.npc
+        // Fill in all the fields
+        setUsername(npc.username)
+        setDisplayName(npc.display_name)
+        setBio(npc.bio)
+        setPersonaName(npc.persona_name)
+        setPersonaPrompt(npc.persona_prompt)
+        setTone(npc.tone)
+        setPostTypes(npc.post_types)
+        setVisualPersona(npc.visual_persona)
+        setGenerateImages(true) // Enable image generation by default
+        
+        // Clear the quick create field
+        setQuickCreateDescription('')
+      }
+    } catch (error) {
+      setError(error instanceof Error ? error.message : 'Failed to generate NPC')
+    } finally {
+      setGeneratingNPC(false)
     }
   }
 
@@ -713,6 +768,63 @@ export function NPCCreateModal({ isOpen, onClose, onCreated, editNPC }: NPCCreat
                     : 'Create a new user account for this NPC'
                   }
                 </p>
+
+                {/* Quick Create with AI - Only show in create mode */}
+                {!isEditMode && (
+                  <div className="mb-6 p-4 bg-gradient-to-br from-primary/10 to-primary/5 border border-primary/20 rounded-xl">
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-10 h-10 rounded-xl bg-primary/20 flex items-center justify-center">
+                        <Sparkles size={20} className="text-primary" />
+                      </div>
+                      <div>
+                        <h4 className="text-sm font-semibold text-text">Quick Create with AI</h4>
+                        <p className="text-xs text-text-secondary">Describe your NPC and let AI fill in everything</p>
+                      </div>
+                    </div>
+                    
+                    <textarea
+                      placeholder="e.g., A witty startup coach who shares lessons from 10 years of building companies. Loves data, hates fluff. Has a dry sense of humor and frequently calls out BS in the startup world..."
+                      value={quickCreateDescription}
+                      onChange={(e) => setQuickCreateDescription(e.target.value)}
+                      rows={3}
+                      className="w-full px-4 py-3 bg-surface border border-border rounded-xl text-sm text-text placeholder:text-text-tertiary focus:outline-none focus:border-primary resize-none mb-3"
+                    />
+                    
+                    <Button
+                      variant="primary"
+                      onClick={handleGenerateCompleteNPC}
+                      disabled={generatingNPC || quickCreateDescription.length < 10}
+                      className="w-full"
+                    >
+                      {generatingNPC ? (
+                        <>
+                          <RefreshCw size={16} className="animate-spin" />
+                          Generating NPC...
+                        </>
+                      ) : (
+                        <>
+                          <Wand2 size={16} />
+                          Generate Complete NPC
+                        </>
+                      )}
+                    </Button>
+                    
+                    {quickCreateDescription.length > 0 && quickCreateDescription.length < 10 && (
+                      <p className="text-xs text-text-tertiary mt-2">
+                        Add more detail ({10 - quickCreateDescription.length} more characters needed)
+                      </p>
+                    )}
+                  </div>
+                )}
+
+                {/* Divider - only show in create mode */}
+                {!isEditMode && (
+                  <div className="flex items-center gap-4 mb-6">
+                    <div className="flex-1 h-px bg-border" />
+                    <span className="text-xs text-text-tertiary">or fill in manually</span>
+                    <div className="flex-1 h-px bg-border" />
+                  </div>
+                )}
                 
                 {/* Username */}
                 <div className="mb-4">

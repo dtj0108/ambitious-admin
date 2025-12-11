@@ -1,6 +1,135 @@
 import { createAIProvider } from './ai-providers'
 import type { VisualPersona, PostType, Tone, AIModel, ImageStyle } from '../queries-npc'
 
+// =====================================================
+// Complete NPC Generation
+// =====================================================
+
+export interface GenerateCompleteNPCRequest {
+  description: string
+  aiModel?: AIModel
+  temperature?: number
+}
+
+export interface GeneratedNPCData {
+  username: string
+  display_name: string
+  bio: string
+  persona_name: string
+  persona_prompt: string
+  tone: Tone
+  post_types: PostType[]
+  visual_persona: VisualPersona
+}
+
+/**
+ * Generate a complete NPC profile from a free-text description
+ */
+export async function generateCompleteNPC(
+  request: GenerateCompleteNPCRequest
+): Promise<GeneratedNPCData> {
+  const provider = createAIProvider(request.aiModel || 'openai', { temperature: request.temperature || 0.8 })
+
+  const systemPrompt = `You are an expert at creating detailed character profiles for social media NPCs (AI-powered virtual users).
+Based on a brief description, create a complete character profile that feels authentic and unique.
+
+IMPORTANT RULES:
+1. Create a believable, three-dimensional character with a specific background
+2. The username should be memorable, lowercase, only letters/numbers/underscores, 3-15 chars
+3. The persona_prompt should be detailed (200-400 words) and include: background story, personality traits, communication style, expertise areas, pet peeves, and specific phrases they might use
+4. Choose a tone that matches their personality
+5. Select post_types that fit their character
+6. Create a vivid visual persona with specific physical details
+
+Available tones: casual, professional, inspirational, humorous, motivational, friendly
+Available post_types: win, dream, ask, hangout, intro, general
+
+Respond with ONLY a valid JSON object in this exact format:
+{
+  "username": "lowercase_username",
+  "display_name": "Full Display Name",
+  "bio": "Profile bio (2-3 sentences max, under 160 chars)",
+  "persona_name": "Descriptive Title (e.g., Tech Startup Coach)",
+  "persona_prompt": "Detailed character prompt for AI generation. Include: who they are, their background, how they communicate, what they care about, their expertise, personality quirks, and writing style guidelines.",
+  "tone": "one of the available tones",
+  "post_types": ["array", "of", "post_types"],
+  "visual_persona": {
+    "appearance": "Physical description: age, ethnicity, hair, facial features, build",
+    "style": "Overall aesthetic and personal style",
+    "clothing": "Typical clothing, colors, accessories",
+    "environment": "Common settings and backgrounds",
+    "photography_style": "Image style: lighting, composition, mood"
+  }
+}`
+
+  const userPrompt = `Create a complete NPC profile based on this description:
+
+"${request.description}"
+
+Remember to respond with ONLY valid JSON. Make the character feel real and specific, not generic.`
+
+  try {
+    const response = await provider.generatePost({
+      personaName: 'NPC Generator',
+      personaDescription: systemPrompt,
+      personaPrompt: systemPrompt,
+      topics: [],
+      tone: 'professional',
+      postType: 'general',
+      additionalContext: userPrompt,
+    })
+
+    const content = response.content.trim()
+    const jsonMatch = content.match(/\{[\s\S]*\}/)
+    
+    if (jsonMatch) {
+      const parsed = JSON.parse(jsonMatch[0])
+      
+      // Validate and sanitize the response
+      const validTones: Tone[] = ['casual', 'professional', 'inspirational', 'humorous', 'motivational', 'friendly']
+      const validPostTypes: PostType[] = ['win', 'dream', 'ask', 'hangout', 'intro', 'general']
+      
+      return {
+        username: sanitizeUsername(parsed.username || 'npc_user'),
+        display_name: parsed.display_name || 'NPC User',
+        bio: (parsed.bio || '').substring(0, 500),
+        persona_name: parsed.persona_name || 'NPC',
+        persona_prompt: parsed.persona_prompt || '',
+        tone: validTones.includes(parsed.tone) ? parsed.tone : 'casual',
+        post_types: Array.isArray(parsed.post_types) 
+          ? parsed.post_types.filter((t: string) => validPostTypes.includes(t as PostType))
+          : ['general'],
+        visual_persona: {
+          appearance: parsed.visual_persona?.appearance || '',
+          style: parsed.visual_persona?.style || '',
+          clothing: parsed.visual_persona?.clothing || '',
+          environment: parsed.visual_persona?.environment || '',
+          photography_style: parsed.visual_persona?.photography_style || '',
+        },
+      }
+    }
+
+    throw new Error('Failed to parse NPC data from AI response')
+  } catch (error) {
+    console.error('[generateCompleteNPC] Error:', error)
+    throw error
+  }
+}
+
+/**
+ * Sanitize username to be valid (lowercase, alphanumeric + underscore only)
+ */
+function sanitizeUsername(username: string): string {
+  return username
+    .toLowerCase()
+    .replace(/[^a-z0-9_]/g, '')
+    .substring(0, 15) || 'npc_user'
+}
+
+// =====================================================
+// Visual Persona Generation
+// =====================================================
+
 export interface GenerateVisualPersonaRequest {
   personaName: string
   personaPrompt: string
