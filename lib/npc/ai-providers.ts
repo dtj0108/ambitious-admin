@@ -71,9 +71,32 @@ Post types:
    - Real people trail off, change their minds, don't always conclude
 
 8. VARY EVERYTHING
-   - Length: one-liners sometimes, longer sometimes
    - Mood: not always the same energy
    - Structure: questions, observations, stories, hot takes
+
+9. LENGTH VARIATION (CRITICAL)
+   - Before writing, silently pick ONE length bucket (do NOT announce it):
+     - ONE-LINER: 5–20 words, 1 sentence
+     - SHORT: 20–45 words, 1–2 sentences
+     - MEDIUM: 45–90 words, 2–5 sentences
+     - LONG: 90–160 words, 4–10 sentences (you may use 1 line break if it feels natural)
+   - If you're unsure which to choose, prefer the extremes: ONE-LINER or LONG.
+   - Don't drift into the default 2–3 sentence “safe” post every time.
+   - If you notice you're about to write ~2–3 sentences again, STOP and pick a different bucket.
+   - If your recent posts look similar in length/sentence count, deliberately choose a different bucket for this post.
+   - Use this concrete check: if your most recent post looks ~30–60 words, go VERY short (<15 words) or noticeably longer (>90 words) this time.
+
+10. OPENING DIVERSITY (CRITICAL)
+   - Do NOT start with the same first two words as any of the recent posts shown.
+   - If your draft starts the same way as a recent post (e.g. "Client just...", "Forgot to...", "Guy in the..."), rewrite the opening line.
+
+11. ANTI-GENERIC RULES (CRITICAL)
+   - No tidy moral or “lesson learned” wrap-up.
+   - No listicles or “3 tips” energy unless explicitly asked.
+   - Avoid these generic openers/phrases: "Just a reminder", "Here's what I learned", "I wanted to share", "In today's world",
+     "At the end of the day", "Game changer", "Key takeaway", "TL;DR", "I'm excited to announce", "If you're struggling".
+   - For anything above ONE-LINER length: include at least ONE concrete detail (time, place, object, number, or sensory detail).
+   - Write like a real person posting in the moment, not like you're giving a talk.
 
 === WHAT NOT TO DO ===
 - Don't sound like a LinkedIn post or motivational quote
@@ -86,13 +109,39 @@ Post types:
 function buildPreviousPostsContext(previousPosts?: string[]): string {
   if (!previousPosts?.length) return ''
   
+  const maxPosts = 8
+  const previewChars = 200
+
+  // `previousPosts` may include historical posts plus newly-generated posts appended during a batch.
+  // To help variety within a single batch, include a mix from the end (newest generated) and the start (recent DB posts).
+  const tailCount = Math.floor(maxPosts / 2) // newest generated tend to be appended
+  const headCount = maxPosts - tailCount     // recent DB posts often come first
+
+  const tailNewestFirst = previousPosts.slice(-tailCount).reverse()
+  const headRecent = previousPosts.slice(0, headCount)
+
+  const seen = new Set<string>()
+  const postsForContext = [...tailNewestFirst, ...headRecent].filter((p) => {
+    const key = (p || '').trim()
+    if (!key) return false
+    if (seen.has(key)) return false
+    seen.add(key)
+    return true
+  })
+
   return `\n\n=== YOUR RECENT POSTS (don't repeat yourself) ===
-${previousPosts.slice(0, 5).map((p, i) => `${i + 1}. "${p.substring(0, 60)}${p.length > 60 ? '...' : ''}"`).join('\n')}
+${postsForContext.slice(0, maxPosts).map((p, i) => {
+  const compact = (p || '').replace(/\s+/g, ' ').trim()
+  const preview = `${compact.substring(0, previewChars)}${compact.length > previewChars ? '...' : ''}`
+  return `${i + 1}. "${preview}"`
+}).join('\n')}
 
 For this new post, be DIFFERENT:
-- Different length, mood, structure
+- Different length, mood, structure (especially sentence count)
 - Different angle on your life
 - Maybe skip elements you always include
+- Avoid reusing the same opening cadence (first 3–5 words) from the last few posts
+- Avoid repeating the same “props”/motifs you lean on (e.g., coffee, elevator small talk, Bloomberg terminal)
 - Surprise us. Show range.`
 }
 
@@ -134,8 +183,8 @@ export class OpenAIProvider implements AIProvider {
   constructor(config: AIProviderConfig) {
     this.apiKey = config.apiKey
     this.model = config.model || 'gpt-4o'
-    this.maxTokens = config.maxTokens || 500
-    this.temperature = config.temperature || 0.8
+    this.maxTokens = config.maxTokens ?? 500
+    this.temperature = config.temperature ?? 0.8
   }
 
   async generatePost(request: GeneratePostRequest): Promise<GeneratePostResponse> {
@@ -288,8 +337,8 @@ export class ClaudeProvider implements AIProvider {
   constructor(config: AIProviderConfig) {
     this.apiKey = config.apiKey
     this.model = config.model || 'claude-sonnet-4-20250514'
-    this.maxTokens = config.maxTokens || 500
-    this.temperature = config.temperature || 0.8
+    this.maxTokens = config.maxTokens ?? 500
+    this.temperature = config.temperature ?? 0.8
   }
 
   async generatePost(request: GeneratePostRequest): Promise<GeneratePostResponse> {
@@ -306,6 +355,7 @@ export class ClaudeProvider implements AIProvider {
       body: JSON.stringify({
         model: this.model,
         max_tokens: this.maxTokens,
+        temperature: this.temperature,
         system: systemPrompt,
         messages: [
           {
@@ -345,6 +395,7 @@ export class ClaudeProvider implements AIProvider {
       body: JSON.stringify({
         model: this.model,
         max_tokens: 200,
+        temperature: this.temperature,
         system: systemPrompt,
         messages: [
           {
@@ -438,8 +489,8 @@ export class XAIProvider implements AIProvider {
   constructor(config: AIProviderConfig) {
     this.apiKey = config.apiKey
     this.model = config.model || 'grok-4-1-fast-non-reasoning'
-    this.maxTokens = config.maxTokens || 500
-    this.temperature = config.temperature || 0.8
+    this.maxTokens = config.maxTokens ?? 500
+    this.temperature = config.temperature ?? 0.8
   }
 
   async generatePost(request: GeneratePostRequest): Promise<GeneratePostResponse> {

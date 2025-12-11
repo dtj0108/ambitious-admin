@@ -86,6 +86,24 @@ export class ContentGenerator {
       console.warn('[ContentGenerator] Image generation enabled but GEMINI_API_KEY not configured')
     }
 
+    // Length hinting: keep the NPC "free", but strongly encourage visible variety.
+    // This is intentionally random per post to avoid the model drifting to a consistent safe length.
+    const pickLengthHint = (): string => {
+      const r = Math.random()
+
+      // Slight bias towards extremes (one-liner / long) to force range.
+      if (r < 0.35) {
+        return 'Length target: ONE-LINER (5–20 words, 1 sentence). Do not mention word counts or labels.'
+      }
+      if (r < 0.55) {
+        return 'Length target: SHORT (20–45 words, 1–2 sentences). Do not mention word counts or labels.'
+      }
+      if (r < 0.75) {
+        return 'Length target: MEDIUM (45–90 words, 2–5 sentences). Do not mention word counts or labels.'
+      }
+      return 'Length target: LONG (90–160 words, 4–10 sentences; 1 line break allowed if natural). Do not mention word counts or labels.'
+    }
+
     for (let i = 0; i < count; i++) {
       // Pick a random post type from allowed types
       const postType = postTypes[Math.floor(Math.random() * postTypes.length)]
@@ -98,9 +116,13 @@ export class ContentGenerator {
         tone,
         postType,
         previousPosts: previousContents, // For avoiding repetition
+        additionalContext: pickLengthHint(),
       }
 
       try {
+        console.log(
+          `[ContentGenerator] Generating post ${i + 1}/${count} (${postType}) lengthHint="${request.additionalContext}" previousPosts=${previousContents.length}`
+        )
         const response = await provider.generatePost(request)
         
         // Use pre-calculated random schedule time
@@ -188,7 +210,8 @@ export class ContentGenerator {
         }
 
         generatedPosts.push(post)
-        previousContents.push(response.content)
+        // Keep most-recent-first so the prompt sees the latest post during a batch.
+        previousContents.unshift(response.content)
 
         // Add to queue
         await addToQueue({
