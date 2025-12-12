@@ -1,40 +1,233 @@
 import { NextResponse } from 'next/server'
 import { supabaseAdmin, isServiceRoleConfigured } from '@/lib/supabase'
 
-// Helper to get start date based on date range
-function getAnalyticsStartDate(dateRange: string): string | null {
+// ===== TIMEZONE-AWARE DATE UTILITIES =====
+// All date calculations now use the client's timezone for consistency
+
+/**
+ * Get the current time in the client's timezone
+ */
+function getNowInTimezone(timezone: string): Date {
+  // Get current UTC time
   const now = new Date()
+  // Format it in the target timezone to get the local date/time components
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+  })
+  const parts = formatter.formatToParts(now)
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '0'
+  
+  // Create a date object representing "now" in the client's timezone
+  // We use UTC methods to avoid any server timezone interference
+  return new Date(Date.UTC(
+    parseInt(get('year')),
+    parseInt(get('month')) - 1,
+    parseInt(get('day')),
+    parseInt(get('hour')),
+    parseInt(get('minute')),
+    parseInt(get('second'))
+  ))
+}
+
+/**
+ * Get midnight (start of day) in the client's timezone, returned as ISO string
+ */
+function getStartOfTodayInTimezone(timezone: string): string {
+  const now = new Date()
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const parts = formatter.formatToParts(now)
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '0'
+  
+  // Get the timezone offset for this specific date/time
+  const localDateStr = `${get('year')}-${get('month')}-${get('day')}T00:00:00`
+  
+  // Create a date in the target timezone at midnight
+  const midnightLocal = new Date(localDateStr)
+  const midnightFormatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+    hour12: false,
+    timeZoneName: 'short',
+  })
+  
+  // Calculate the UTC time that corresponds to midnight in the target timezone
+  // We need to find what UTC time equals midnight in the client timezone
+  const tzOffset = getTimezoneOffsetMinutes(timezone, now)
+  const midnightUTC = new Date(now)
+  midnightUTC.setUTCHours(0, 0, 0, 0)
+  midnightUTC.setUTCFullYear(parseInt(get('year')), parseInt(get('month')) - 1, parseInt(get('day')))
+  midnightUTC.setUTCMinutes(midnightUTC.getUTCMinutes() + tzOffset)
+  
+  return midnightUTC.toISOString()
+}
+
+/**
+ * Get the timezone offset in minutes for a given timezone
+ */
+function getTimezoneOffsetMinutes(timezone: string, date: Date): number {
+  const utcDate = new Date(date.toLocaleString('en-US', { timeZone: 'UTC' }))
+  const tzDate = new Date(date.toLocaleString('en-US', { timeZone: timezone }))
+  return (utcDate.getTime() - tzDate.getTime()) / 60000
+}
+
+/**
+ * Get N days ago at midnight in the client's timezone
+ */
+function getDaysAgoInTimezone(days: number, timezone: string): string {
+  const now = new Date()
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  
+  // First get today's date in the timezone
+  const parts = formatter.formatToParts(now)
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '0'
+  
+  // Create a date for today in that timezone, then subtract days
+  const todayInTz = new Date(Date.UTC(
+    parseInt(get('year')),
+    parseInt(get('month')) - 1,
+    parseInt(get('day')),
+    0, 0, 0
+  ))
+  todayInTz.setUTCDate(todayInTz.getUTCDate() - days)
+  
+  // Now convert that back to a UTC timestamp accounting for timezone offset
+  const tzOffset = getTimezoneOffsetMinutes(timezone, now)
+  todayInTz.setUTCMinutes(todayInTz.getUTCMinutes() + tzOffset)
+  
+  return todayInTz.toISOString()
+}
+
+/**
+ * Get start date based on date range filter
+ */
+function getAnalyticsStartDate(dateRange: string, timezone: string): string | null {
   switch (dateRange) {
     case 'today':
-      now.setHours(0, 0, 0, 0)
-      return now.toISOString()
+      return getStartOfTodayInTimezone(timezone)
     case '7d':
-      now.setDate(now.getDate() - 7)
-      return now.toISOString()
+      return getDaysAgoInTimezone(7, timezone)
     case '30d':
-      now.setDate(now.getDate() - 30)
-      return now.toISOString()
+      return getDaysAgoInTimezone(30, timezone)
     case '90d':
-      now.setDate(now.getDate() - 90)
-      return now.toISOString()
+      return getDaysAgoInTimezone(90, timezone)
     case 'all':
       return null
     default:
-      now.setDate(now.getDate() - 7)
-      return now.toISOString()
+      return getDaysAgoInTimezone(7, timezone)
   }
 }
 
-function getDaysAgo(days: number): string {
-  const date = new Date()
-  date.setDate(date.getDate() - days)
-  return date.toISOString()
+/**
+ * Format a UTC date as YYYY-MM-DD in the client's timezone
+ */
+function formatDateInTimezone(date: Date, timezone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+  })
+  const parts = formatter.formatToParts(date)
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '0'
+  return `${get('year')}-${get('month')}-${get('day')}`
 }
 
-function getStartOfToday(): string {
-  const now = new Date()
-  now.setHours(0, 0, 0, 0)
-  return now.toISOString()
+/**
+ * Get the start of a week (Sunday) for a date in the client's timezone
+ */
+function getStartOfWeekInTimezone(date: Date, timezone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    weekday: 'short',
+  })
+  const parts = formatter.formatToParts(date)
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '0'
+  
+  // Get day of week (0 = Sunday)
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const dayOfWeek = weekdays.indexOf(get('weekday'))
+  
+  // Create date and subtract to get to Sunday
+  const d = new Date(Date.UTC(
+    parseInt(get('year')),
+    parseInt(get('month')) - 1,
+    parseInt(get('day'))
+  ))
+  d.setUTCDate(d.getUTCDate() - dayOfWeek)
+  
+  return `${d.getUTCFullYear()}-${String(d.getUTCMonth() + 1).padStart(2, '0')}-${String(d.getUTCDate()).padStart(2, '0')}`
+}
+
+/**
+ * Get the start of a month for a date in the client's timezone
+ */
+function getStartOfMonthInTimezone(date: Date, timezone: string): string {
+  const formatter = new Intl.DateTimeFormat('en-US', {
+    timeZone: timezone,
+    year: 'numeric',
+    month: '2-digit',
+  })
+  const parts = formatter.formatToParts(date)
+  const get = (type: string) => parts.find(p => p.type === type)?.value || '0'
+  return `${get('year')}-${get('month')}-01`
+}
+
+/**
+ * Get period key for grouping events (day/week/month) using client timezone
+ */
+function getPeriodKey(date: Date, groupBy: string, timezone: string): string {
+  switch (groupBy) {
+    case 'day':
+      return formatDateInTimezone(date, timezone)
+    case 'week':
+      return getStartOfWeekInTimezone(date, timezone)
+    case 'month':
+      return getStartOfMonthInTimezone(date, timezone)
+    default:
+      return formatDateInTimezone(date, timezone)
+  }
+}
+
+/**
+ * Format period label for display
+ */
+function formatPeriodLabel(dateKey: string, groupBy: string): string {
+  const date = new Date(dateKey + 'T12:00:00Z') // Use noon to avoid timezone edge cases
+  switch (groupBy) {
+    case 'day':
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: 'UTC' })
+    case 'week':
+      return `Week of ${date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })}`
+    case 'month':
+      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric', timeZone: 'UTC' })
+    default:
+      return dateKey
+  }
 }
 
 export async function GET(request: Request) {
@@ -46,6 +239,9 @@ export async function GET(request: Request) {
   const dateRange = searchParams.get('dateRange') || '7d'
   const platform = searchParams.get('platform') || 'all'
   const eventType = searchParams.get('eventType') || undefined
+  const groupBy = searchParams.get('groupBy') || 'day'
+  // Get client timezone, default to America/New_York if not provided
+  const timezone = searchParams.get('timezone') || 'America/New_York'
 
   const daysMap: Record<string, number> = {
     'today': 1,
@@ -55,7 +251,7 @@ export async function GET(request: Request) {
     'all': 90,
   }
   const days = daysMap[dateRange] || 7
-  const startDate = getAnalyticsStartDate(dateRange)
+  const startDate = getAnalyticsStartDate(dateRange, timezone)
 
   try {
     // ===== OVERVIEW =====
@@ -86,7 +282,7 @@ export async function GET(request: Request) {
     }
 
     // ===== EVENTS OVER TIME (trend) =====
-    const trendStartDate = getDaysAgo(days)
+    const trendStartDate = getDaysAgoInTimezone(days, timezone)
     let trendQuery = supabaseAdmin.from('analytics_events').select('created_at, platform').gte('created_at', trendStartDate)
     if (platform && platform !== 'all') trendQuery = trendQuery.eq('platform', platform)
     if (eventType) trendQuery = trendQuery.eq('event_name', eventType)
@@ -94,22 +290,23 @@ export async function GET(request: Request) {
     const { data: trendData } = await trendQuery
 
     const eventsByDate: Record<string, number> = {}
-    // Initialize all days
+    // Initialize all days using client timezone
     for (let i = days - 1; i >= 0; i--) {
       const date = new Date()
       date.setDate(date.getDate() - i)
-      const dateStr = date.toISOString().split('T')[0]
+      const dateStr = formatDateInTimezone(date, timezone)
       eventsByDate[dateStr] = 0
     }
     trendData?.forEach(e => {
-      const date = new Date(e.created_at).toISOString().split('T')[0]
-      eventsByDate[date] = (eventsByDate[date] || 0) + 1
+      // Convert event time to client timezone for grouping
+      const dateStr = formatDateInTimezone(new Date(e.created_at), timezone)
+      eventsByDate[dateStr] = (eventsByDate[dateStr] || 0) + 1
     })
 
     const trend = Object.entries(eventsByDate)
       .map(([date, count]) => {
-        const dateObj = new Date(date + 'T00:00:00')
-        const label = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+        const dateObj = new Date(date + 'T12:00:00Z')
+        const label = dateObj.toLocaleDateString('en-US', { month: 'short', day: 'numeric', timeZone: 'UTC' })
         return { date, label, count }
       })
       .sort((a, b) => a.date.localeCompare(b.date))
@@ -187,26 +384,29 @@ export async function GET(request: Request) {
     const eventNames = [...new Set(eventNamesData?.map(e => e.event_name) || [])].sort()
 
     // ===== KEY EVENTS METRICS =====
+    // Now uses timezone-aware dates AND applies platform/eventType filters consistently
     const impressionEvents = ['impression', 'post_viewed', 'screen_viewed', 'page_view', 'view']
-    const startOfToday = getStartOfToday()
-    const sevenDaysAgo = getDaysAgo(7)
-    const thirtyDaysAgo = getDaysAgo(30)
-    const fourteenDaysAgo = getDaysAgo(14)
+    const startOfToday = getStartOfTodayInTimezone(timezone)
+    const sevenDaysAgo = getDaysAgoInTimezone(7, timezone)
+    const thirtyDaysAgo = getDaysAgoInTimezone(30, timezone)
+    const fourteenDaysAgo = getDaysAgoInTimezone(14, timezone)
+
+    // Build base queries with consistent filter application
+    const buildKeyEventsQuery = (startDate: string, endDate?: string) => {
+      let query = supabaseAdmin.from('analytics_events').select('id', { count: 'exact', head: true })
+        .gte('created_at', startDate)
+      if (endDate) query = query.lt('created_at', endDate)
+      query = query.or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(','))
+      // Apply platform filter consistently with other sections
+      if (platform && platform !== 'all') query = query.eq('platform', platform)
+      return query
+    }
 
     const [todayResult, weekResult, monthResult, prevWeekResult] = await Promise.all([
-      supabaseAdmin.from('analytics_events').select('id', { count: 'exact', head: true })
-        .gte('created_at', startOfToday)
-        .or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(',')),
-      supabaseAdmin.from('analytics_events').select('id', { count: 'exact', head: true })
-        .gte('created_at', sevenDaysAgo)
-        .or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(',')),
-      supabaseAdmin.from('analytics_events').select('id', { count: 'exact', head: true })
-        .gte('created_at', thirtyDaysAgo)
-        .or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(',')),
-      supabaseAdmin.from('analytics_events').select('id', { count: 'exact', head: true })
-        .gte('created_at', fourteenDaysAgo)
-        .lt('created_at', sevenDaysAgo)
-        .or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(',')),
+      buildKeyEventsQuery(startOfToday),
+      buildKeyEventsQuery(sevenDaysAgo),
+      buildKeyEventsQuery(thirtyDaysAgo),
+      buildKeyEventsQuery(fourteenDaysAgo, sevenDaysAgo),
     ])
 
     const impressionsToday = todayResult.count || 0
@@ -232,13 +432,13 @@ export async function GET(request: Request) {
     }
 
     // ===== ENGAGEMENT METRICS =====
-    const now = new Date()
-    const todayStartDate = new Date(now); todayStartDate.setHours(0, 0, 0, 0)
-    const weekStartDate = new Date(now); weekStartDate.setDate(weekStartDate.getDate() - 7)
-    const monthStartDate = new Date(now); monthStartDate.setDate(monthStartDate.getDate() - 30)
+    // Use timezone-aware date boundaries for consistent counting
+    const engagementTodayStart = new Date(startOfToday)
+    const engagementWeekStart = new Date(sevenDaysAgo)
+    const engagementMonthStart = new Date(thirtyDaysAgo)
 
     let engagementQuery = supabaseAdmin.from('analytics_events').select('event_name, created_at')
-      .gte('created_at', monthStartDate.toISOString())
+      .gte('created_at', thirtyDaysAgo)
     if (platform && platform !== 'all') engagementQuery = engagementQuery.eq('platform', platform)
 
     const { data: engagementData } = await engagementQuery
@@ -260,8 +460,8 @@ export async function GET(request: Request) {
       else if (e.event_name === 'follow' || e.event_name.includes('follow')) key = 'follow'
       
       if (key && engagementCounts[key]) {
-        if (eventDate >= todayStartDate) engagementCounts[key].today++
-        if (eventDate >= weekStartDate) engagementCounts[key].week++
+        if (eventDate >= engagementTodayStart) engagementCounts[key].today++
+        if (eventDate >= engagementWeekStart) engagementCounts[key].week++
         engagementCounts[key].month++
       }
     })
@@ -282,9 +482,11 @@ export async function GET(request: Request) {
     }
 
     // ===== LOOP METRICS =====
+    // Use timezone-aware dates and apply platform filter consistently
     let loopQuery = supabaseAdmin.from('analytics_events').select('event_name, created_at, user_id, properties')
-      .gte('created_at', monthStartDate.toISOString())
+      .gte('created_at', thirtyDaysAgo)
       .ilike('event_name', 'loop%')
+    if (platform && platform !== 'all') loopQuery = loopQuery.eq('platform', platform)
 
     const { data: loopData } = await loopQuery
 
@@ -314,8 +516,8 @@ export async function GET(request: Request) {
       else if (e.event_name.includes('comment')) category = 'comments'
 
       if (category) {
-        if (eventDate >= todayStartDate) loopCounts[category].today++
-        if (eventDate >= weekStartDate) loopCounts[category].week++
+        if (eventDate >= engagementTodayStart) loopCounts[category].today++
+        if (eventDate >= engagementWeekStart) loopCounts[category].week++
         loopCounts[category].month++
       }
     })
@@ -334,6 +536,185 @@ export async function GET(request: Request) {
       avgViewsPerLoop,
     }
 
+    // ===== TIMEFRAME DATA (grouped by day/week/month) =====
+    // Uses SQL aggregation to avoid row limit issues
+    const pageViewPatterns = ['page_view', 'screen_viewed']
+    
+    // Determine how far back to fetch based on groupBy
+    const timeframeDays = groupBy === 'month' ? 365 : groupBy === 'week' ? 90 : days
+    const timeframeStartDate = getDaysAgoInTimezone(timeframeDays, timezone)
+    
+    // Build date list for the period
+    const periodData: Record<string, { impressions: number; pageViews: number }> = {}
+    
+    // Generate all period keys we want to show
+    const periodKeys: string[] = []
+    for (let i = 0; i < timeframeDays; i++) {
+      const date = new Date()
+      date.setDate(date.getDate() - i)
+      const key = getPeriodKey(date, groupBy, timezone)
+      if (!periodKeys.includes(key)) {
+        periodKeys.push(key)
+        periodData[key] = { impressions: 0, pageViews: 0 }
+      }
+    }
+    
+    // Query each period individually to avoid row limit
+    // Use count queries which bypass the row limit
+    const periodQueries = periodKeys.slice(0, 30).map(async (periodKey) => {
+      // Calculate the start and end of this period in UTC
+      let periodStart: string
+      let periodEnd: string
+      
+      const tzOffset = getTimezoneOffsetMinutes(timezone, new Date())
+      const [year, month, day] = periodKey.split('-').map(Number)
+      
+      if (groupBy === 'day') {
+        // For a day like 2025-12-11, calculate midnight to midnight in client timezone
+        // Start: midnight of this day in client timezone, converted to UTC
+        const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
+        startDate.setUTCMinutes(startDate.getUTCMinutes() + tzOffset)
+        periodStart = startDate.toISOString()
+        
+        // End: midnight of next day in client timezone, converted to UTC
+        const endDate = new Date(Date.UTC(year, month - 1, day + 1, 0, 0, 0))
+        endDate.setUTCMinutes(endDate.getUTCMinutes() + tzOffset)
+        periodEnd = endDate.toISOString()
+      } else if (groupBy === 'week') {
+        // For a week starting on the given date (Sunday)
+        // periodKey is the Sunday of that week (e.g., 2025-12-08)
+        const startDate = new Date(Date.UTC(year, month - 1, day, 0, 0, 0))
+        startDate.setUTCMinutes(startDate.getUTCMinutes() + tzOffset)
+        periodStart = startDate.toISOString()
+        
+        // End: 7 days later (next Sunday)
+        const endDate = new Date(Date.UTC(year, month - 1, day + 7, 0, 0, 0))
+        endDate.setUTCMinutes(endDate.getUTCMinutes() + tzOffset)
+        periodEnd = endDate.toISOString()
+      } else {
+        // For a month (periodKey is like 2025-12-01)
+        // Start: first day of the month
+        const startDate = new Date(Date.UTC(year, month - 1, 1, 0, 0, 0))
+        startDate.setUTCMinutes(startDate.getUTCMinutes() + tzOffset)
+        periodStart = startDate.toISOString()
+        
+        // End: first day of next month
+        const endDate = new Date(Date.UTC(year, month, 1, 0, 0, 0))
+        endDate.setUTCMinutes(endDate.getUTCMinutes() + tzOffset)
+        periodEnd = endDate.toISOString()
+      }
+      
+      // Build query for this period
+      let query = supabaseAdmin.from('analytics_events')
+        .select('id', { count: 'exact', head: true })
+        .gte('created_at', periodStart)
+        .lt('created_at', periodEnd)
+        .or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(','))
+      
+      if (platform && platform !== 'all') {
+        query = query.eq('platform', platform)
+      }
+      
+      const { count } = await query
+      return { periodKey, impressions: count || 0 }
+    })
+    
+    const periodResults = await Promise.all(periodQueries)
+    periodResults.forEach(({ periodKey, impressions }) => {
+      if (periodData[periodKey]) {
+        periodData[periodKey].impressions = impressions
+      }
+    })
+    
+    // For backward compatibility, keep timeframeRawData reference
+    const timeframeRawData: Array<{ event_name: string; created_at: string }> = []
+    
+    // Convert to array and sort by date descending (most recent first)
+    // Filter out periods with 0 impressions to keep table clean
+    const timeframePeriods = Object.entries(periodData)
+      .filter(([, counts]) => counts.impressions > 0)
+      .map(([dateKey, counts]) => {
+        return {
+          period: formatPeriodLabel(dateKey, groupBy),
+          date: dateKey,
+          impressions: counts.impressions,
+          pageViews: counts.pageViews, // Will be 0 for now, could add separate count query
+          isTotal: false,
+        }
+      })
+      .sort((a, b) => b.date.localeCompare(a.date))
+    
+    // Add summary rows at the top that match the hero card totals
+    const timeframeData = [
+      {
+        period: '📊 Today (Rolling)',
+        date: 'zzz-total-today', // Sort to top with zzz prefix
+        impressions: impressionsToday,
+        pageViews: 0,
+        isTotal: true,
+      },
+      {
+        period: '📊 Last 7 Days (Rolling)',
+        date: 'zzz-total-week',
+        impressions: impressionsWeek,
+        pageViews: 0,
+        isTotal: true,
+      },
+      {
+        period: '📊 Last 30 Days (Rolling)',
+        date: 'zzz-total-month',
+        impressions: impressionsMonth,
+        pageViews: 0,
+        isTotal: true,
+      },
+      ...timeframePeriods,
+    ]
+
+    // ===== DEBUG DIAGNOSTICS =====
+    // Get total count of ALL rows in the table
+    const { count: totalRowsInTable } = await supabaseAdmin
+      .from('analytics_events')
+      .select('id', { count: 'exact', head: true })
+    
+    // Get count of impression events in last 7 days (same filter as Key Events)
+    const { count: impressionEventsLast7Days } = await supabaseAdmin
+      .from('analytics_events')
+      .select('id', { count: 'exact', head: true })
+      .gte('created_at', sevenDaysAgo)
+      .or(impressionEvents.map(e => `event_name.ilike.%${e}%`).join(','))
+    
+    // Get sample of recent event names
+    const { data: sampleEvents } = await supabaseAdmin
+      .from('analytics_events')
+      .select('event_name, created_at')
+      .order('created_at', { ascending: false })
+      .limit(20)
+    
+    // Debug: Get yesterday's key
+    const yesterdayKey = formatDateInTimezone(new Date(Date.now() - 24 * 60 * 60 * 1000), timezone)
+    const yesterdayImpressions = periodData[yesterdayKey]?.impressions || 0
+    
+    const debug = {
+      clientTimezone: timezone,
+      yesterdayDateKey: yesterdayKey,
+      yesterdayImpressions,
+      totalRowsInTable: totalRowsInTable || 0,
+      impressionEventsLast7Days: impressionEventsLast7Days || 0,
+      sampleEventNames: [...new Set(sampleEvents?.map(e => e.event_name) || [])],
+      queryStartDate: startDate,
+      startOfTodayInClientTz: startOfToday,
+      sevenDaysAgoDate: sevenDaysAgo,
+      timeframeStartDate: timeframeStartDate,
+      platformFilter: platform,
+      periodDataKeys: Object.keys(periodData),
+    }
+
+    // Debug logging disabled - uncomment if needed
+    // console.log('\n========== ANALYTICS DEBUG ==========')
+    // console.log('Client Timezone:', timezone)
+    // console.log('Yesterday:', yesterdayKey, '-', yesterdayImpressions, 'impressions')
+    // console.log('======================================\n')
+
     return NextResponse.json({
       data: {
         overview,
@@ -348,6 +729,8 @@ export async function GET(request: Request) {
       keyEvents,
       engagement,
       loops,
+      timeframeData,
+      debug,
     })
   } catch (error) {
     console.error('Error in analytics API:', error)

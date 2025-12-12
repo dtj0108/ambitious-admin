@@ -3823,6 +3823,16 @@ export async function getAnalyticsData(filters: AnalyticsFilters = {}): Promise<
 
 // ===== KEY EVENTS & ENGAGEMENT METRICS =====
 
+export type AnalyticsGroupBy = 'day' | 'week' | 'month'
+
+export interface TimeframeRow {
+  period: string      // "Dec 10, 2024" or "Week of Dec 8" or "December 2024"
+  date: string        // ISO date for sorting
+  impressions: number
+  pageViews: number
+  isTotal?: boolean   // True for summary rows that match hero card totals
+}
+
 export interface KeyEventsMetrics {
   impressionsToday: number
   impressionsWeek: number

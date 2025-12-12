@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { Card, Button } from '@/components'
+import { Card, Button, NPCScheduleChart } from '@/components'
 import { 
   Bot, 
   Plus, 
@@ -21,6 +21,7 @@ import {
   Brain,
   Zap,
   FileText,
+  Calendar,
 } from 'lucide-react'
 import { 
   type NPCProfile, 
@@ -297,6 +298,16 @@ export default function NPCPage() {
           </div>
         </Card>
       )}
+
+      {/* Posting Schedule Visualization */}
+      <div className="space-y-4">
+        <div className="flex items-center gap-2">
+          <Calendar size={20} className="text-primary" />
+          <h2 className="text-lg font-semibold text-text">Posting Schedule</h2>
+          <span className="text-sm text-text-tertiary">- Ensure 24/7 content coverage</span>
+        </div>
+        <NPCScheduleChart />
+      </div>
 
       {/* Search and Filters */}
       <Card padding="none">
