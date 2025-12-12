@@ -6,6 +6,165 @@ import {
 } from '@/lib/queries-npc'
 import { supabase, supabaseAdmin, isSupabaseConfigured, isServiceRoleConfigured } from '@/lib/supabase'
 
+// Helper to get schedule data for the 24-hour coverage chart
+async function getScheduleData(timezone: string = 'America/New_York') {
+  if (!isServiceRoleConfigured || !supabaseAdmin) {
+    return null
+  }
+
+  // Get posts scheduled for the next 7 days
+  const now = new Date()
+  const sevenDaysFromNow = new Date(now.getTime() + 7 * 24 * 60 * 60 * 1000)
+  const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000)
+
+  // Fetch pending posts (scheduled for future)
+  const { data: pendingPosts } = await supabaseAdmin
+    .from('npc_post_queue')
+    .select(`
+      id,
+      scheduled_for,
+      status,
+      post_type,
+      npc_id,
+      npc_profile:npc_profiles!npc_post_queue_npc_id_fkey (
+        persona_name
+      )
+    `)
+    .eq('status', 'pending')
+    .gte('scheduled_for', now.toISOString())
+    .lte('scheduled_for', sevenDaysFromNow.toISOString())
+    .order('scheduled_for', { ascending: true })
+
+  // Fetch recently published posts (last 7 days)
+  const { data: publishedPosts } = await supabaseAdmin
+    .from('npc_post_queue')
+    .select(`
+      id,
+      scheduled_for,
+      published_at,
+      status,
+      post_type,
+      npc_id,
+      npc_profile:npc_profiles!npc_post_queue_npc_id_fkey (
+        persona_name
+      )
+    `)
+    .eq('status', 'published')
+    .gte('published_at', sevenDaysAgo.toISOString())
+    .order('published_at', { ascending: false })
+
+  // Get active NPCs with their schedules
+  const { data: activeNPCs } = await supabaseAdmin
+    .from('npc_profiles')
+    .select('id, persona_name, posting_times, is_active')
+    .eq('is_active', true)
+
+  // Build hourly coverage map for today and next 7 days
+  // Structure: { '2025-12-12': { 0: [], 1: [], ... 23: [] }, ... }
+  const coverage: Record<string, Record<number, Array<{
+    id: string
+    npcId: string
+    npcName: string
+    postType: string
+    status: 'pending' | 'published'
+  }>>> = {}
+
+  // Initialize coverage for next 7 days
+  for (let d = 0; d < 7; d++) {
+    const date = new Date(now)
+    date.setDate(date.getDate() + d)
+    const dateKey = date.toISOString().split('T')[0]
+    coverage[dateKey] = {}
+    for (let h = 0; h < 24; h++) {
+      coverage[dateKey][h] = []
+    }
+  }
+
+  // Add pending posts to coverage
+  pendingPosts?.forEach(post => {
+    const scheduledDate = new Date(post.scheduled_for)
+    const dateKey = scheduledDate.toISOString().split('T')[0]
+    const hour = scheduledDate.getHours()
+    
+    if (coverage[dateKey] && coverage[dateKey][hour] !== undefined) {
+      coverage[dateKey][hour].push({
+        id: post.id,
+        npcId: post.npc_id,
+        npcName: (post.npc_profile as { persona_name: string } | null)?.persona_name || 'Unknown',
+        postType: post.post_type,
+        status: 'pending',
+      })
+    }
+  })
+
+  // Calculate hourly summary across all days
+  const hourlySummary: Array<{
+    hour: number
+    label: string
+    totalPosts: number
+    pendingPosts: number
+    hasGap: boolean
+  }> = []
+
+  for (let h = 0; h < 24; h++) {
+    let total = 0
+    let pending = 0
+    
+    Object.values(coverage).forEach(dayData => {
+      total += dayData[h]?.length || 0
+      pending += dayData[h]?.filter(p => p.status === 'pending').length || 0
+    })
+    
+    hourlySummary.push({
+      hour: h,
+      label: h === 0 ? '12am' : h < 12 ? `${h}am` : h === 12 ? '12pm' : `${h - 12}pm`,
+      totalPosts: total,
+      pendingPosts: pending,
+      hasGap: total === 0,
+    })
+  }
+
+  // Find gaps (hours with no scheduled posts across all days)
+  const gapHours = hourlySummary.filter(h => h.hasGap).map(h => h.label)
+
+  // Today's timeline (detailed view)
+  const todayKey = now.toISOString().split('T')[0]
+  const todayPosts = pendingPosts?.filter(p => 
+    p.scheduled_for.startsWith(todayKey)
+  ).map(p => ({
+    id: p.id,
+    scheduledFor: p.scheduled_for,
+    npcId: p.npc_id,
+    npcName: (p.npc_profile as { persona_name: string } | null)?.persona_name || 'Unknown',
+    postType: p.post_type,
+    status: 'pending' as const,
+  })) || []
+
+  // Stats
+  const totalPendingToday = todayPosts.length
+  const totalPendingWeek = pendingPosts?.length || 0
+  const hoursWithCoverage = hourlySummary.filter(h => !h.hasGap).length
+  const busiestHour = hourlySummary.reduce((max, h) => 
+    h.totalPosts > max.totalPosts ? h : max, hourlySummary[0]
+  )
+
+  return {
+    coverage,
+    hourlySummary,
+    todayPosts,
+    gapHours,
+    stats: {
+      totalPendingToday,
+      totalPendingWeek,
+      hoursWithCoverage,
+      hoursWithGaps: 24 - hoursWithCoverage,
+      busiestHour: busiestHour.label,
+      busiestHourCount: busiestHour.totalPosts,
+    },
+    activeNPCs: activeNPCs?.length || 0,
+  }
+}
+
 // GET /api/npc - List NPCs with filters
 export async function GET(request: NextRequest) {
   try {
@@ -25,6 +184,19 @@ export async function GET(request: NextRequest) {
     if (searchParams.get('stats') === 'true') {
       const stats = await getNPCStats()
       return NextResponse.json(stats)
+    }
+
+    // Check if requesting schedule data
+    if (searchParams.get('schedule') === 'true') {
+      const timezone = searchParams.get('timezone') || 'America/New_York'
+      const scheduleData = await getScheduleData(timezone)
+      if (!scheduleData) {
+        return NextResponse.json(
+          { error: 'Failed to fetch schedule data' },
+          { status: 500 }
+        )
+      }
+      return NextResponse.json(scheduleData)
     }
 
     const result = await getNPCs(options)

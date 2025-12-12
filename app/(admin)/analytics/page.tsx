@@ -37,6 +37,8 @@ import {
   type KeyEventsMetrics,
   type EngagementMetrics,
   type LoopMetrics,
+  type TimeframeRow,
+  type AnalyticsGroupBy,
 } from '@/lib/queries'
 
 const dateRangeOptions: { value: AnalyticsDateRange; label: string }[] = [
@@ -76,12 +78,20 @@ function getPlatformIcon(platform: string) {
   }
 }
 
+const groupByOptions: { value: AnalyticsGroupBy; label: string }[] = [
+  { value: 'day', label: 'Day' },
+  { value: 'week', label: 'Week' },
+  { value: 'month', label: 'Month' },
+]
+
 export default function AnalyticsPage() {
   const [data, setData] = useState<AnalyticsData | null>(null)
   const [keyEvents, setKeyEvents] = useState<KeyEventsMetrics | null>(null)
   const [engagement, setEngagement] = useState<EngagementMetrics | null>(null)
   const [loops, setLoops] = useState<LoopMetrics | null>(null)
   const [eventNames, setEventNames] = useState<string[]>([])
+  const [timeframeData, setTimeframeData] = useState<TimeframeRow[]>([])
+  const [groupBy, setGroupBy] = useState<AnalyticsGroupBy>('day')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [eventDropdownOpen, setEventDropdownOpen] = useState(false)
@@ -103,6 +113,9 @@ export default function AnalyticsPage() {
       if (filters.dateRange) params.set('dateRange', filters.dateRange)
       if (filters.platform) params.set('platform', filters.platform)
       if (filters.eventType) params.set('eventType', filters.eventType)
+      params.set('groupBy', groupBy)
+      // Pass client timezone so API calculates "today" correctly
+      params.set('timezone', Intl.DateTimeFormat().resolvedOptions().timeZone)
       
       const response = await fetch(`/api/admin/analytics?${params.toString()}`)
       
@@ -117,6 +130,7 @@ export default function AnalyticsPage() {
       setKeyEvents(result.keyEvents)
       setEngagement(result.engagement)
       setLoops(result.loops)
+      setTimeframeData(result.timeframeData || [])
     } catch (err) {
       console.error('Failed to fetch analytics data:', err)
       setError('Failed to load analytics data. Please check your connection.')
@@ -127,7 +141,7 @@ export default function AnalyticsPage() {
 
   useEffect(() => {
     fetchData()
-  }, [filters])
+  }, [filters, groupBy])
 
   // Close dropdown when clicking outside
   useEffect(() => {
@@ -942,6 +956,85 @@ export default function AnalyticsPage() {
           </CardContent>
         </Card>
       </div>
+
+      {/* Timeframe Analytics Table */}
+      <Card gradient>
+        <CardHeader>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <CardTitle subtitle="Key events grouped by time period">
+              <div className="flex items-center gap-2">
+                <Calendar size={18} className="text-primary" />
+                Analytics by Timeframe
+              </div>
+            </CardTitle>
+            
+            {/* Group By Toggle */}
+            <div className="flex items-center gap-2 p-1 bg-surface border border-border/50 rounded-xl">
+              {groupByOptions.map((option) => (
+                <button
+                  key={option.value}
+                  onClick={() => setGroupBy(option.value)}
+                  disabled={loading}
+                  className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ${
+                    groupBy === option.value
+                      ? 'bg-primary text-white shadow-sm'
+                      : 'text-text-secondary hover:text-text hover:bg-elevated'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent>
+          {timeframeData.length === 0 ? (
+            <div className="h-32 flex items-center justify-center">
+              <p className="text-text-tertiary">No timeframe data available</p>
+            </div>
+          ) : (
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead>
+                  <tr className="border-b border-border/50">
+                    <th className="text-left py-3 px-4 text-sm font-semibold text-text-secondary">Period</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-text-secondary">Impressions</th>
+                    <th className="text-right py-3 px-4 text-sm font-semibold text-text-secondary">Page Views</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {timeframeData.map((row, idx) => (
+                    <tr 
+                      key={row.date} 
+                      className={`border-b transition-colors ${
+                        row.isTotal 
+                          ? 'bg-gradient-to-r from-primary/10 to-primary/5 border-primary/20 hover:from-primary/15 hover:to-primary/10' 
+                          : 'border-border/30 hover:bg-elevated/30'
+                      }`}
+                    >
+                      <td className="py-3 px-4">
+                        <span className={`text-sm font-medium ${row.isTotal ? 'text-primary font-semibold' : 'text-text'}`}>
+                          {row.period}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <span className={`text-sm font-semibold ${row.isTotal ? 'text-primary' : 'text-text'}`}>
+                          {formatNumber(row.impressions)}
+                        </span>
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <span className={`text-sm font-semibold ${row.isTotal ? 'text-primary' : 'text-text'}`}>
+                          {formatNumber(row.pageViews)}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </CardContent>
+      </Card>
     </div>
   )
 }
