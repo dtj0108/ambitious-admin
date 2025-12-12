@@ -86,11 +86,17 @@ async function getScheduleData(timezone: string = 'America/New_York') {
     const dateKey = scheduledDate.toISOString().split('T')[0]
     const hour = scheduledDate.getHours()
     
+    // Handle npc_profile which could be an object or array from the join
+    const npcProfile = post.npc_profile as { persona_name: string } | { persona_name: string }[] | null
+    const personaName = Array.isArray(npcProfile) 
+      ? npcProfile[0]?.persona_name 
+      : npcProfile?.persona_name
+    
     if (coverage[dateKey] && coverage[dateKey][hour] !== undefined) {
       coverage[dateKey][hour].push({
         id: post.id,
         npcId: post.npc_id,
-        npcName: (post.npc_profile as { persona_name: string } | null)?.persona_name || 'Unknown',
+        npcName: personaName || 'Unknown',
         postType: post.post_type,
         status: 'pending',
       })
@@ -131,14 +137,18 @@ async function getScheduleData(timezone: string = 'America/New_York') {
   const todayKey = now.toISOString().split('T')[0]
   const todayPosts = pendingPosts?.filter(p => 
     p.scheduled_for.startsWith(todayKey)
-  ).map(p => ({
-    id: p.id,
-    scheduledFor: p.scheduled_for,
-    npcId: p.npc_id,
-    npcName: (p.npc_profile as { persona_name: string } | null)?.persona_name || 'Unknown',
-    postType: p.post_type,
-    status: 'pending' as const,
-  })) || []
+  ).map(p => {
+    const profile = p.npc_profile as { persona_name: string } | { persona_name: string }[] | null
+    const name = Array.isArray(profile) ? profile[0]?.persona_name : profile?.persona_name
+    return {
+      id: p.id,
+      scheduledFor: p.scheduled_for,
+      npcId: p.npc_id,
+      npcName: name || 'Unknown',
+      postType: p.post_type,
+      status: 'pending' as const,
+    }
+  }) || []
 
   // Stats
   const totalPendingToday = todayPosts.length
