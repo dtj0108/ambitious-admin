@@ -65,6 +65,9 @@ export function NPCDetailModal({ npcId, isOpen, onClose, onUpdated }: NPCDetailM
   const [activeHoursEnd, setActiveHoursEnd] = useState(22)
   const [savingSchedule, setSavingSchedule] = useState(false)
   
+  // Image lightbox
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
+  
   const fetchNPCDetails = async () => {
     if (!npcId) return
     
@@ -100,6 +103,20 @@ export function NPCDetailModal({ npcId, isOpen, onClose, onUpdated }: NPCDetailM
       fetchNPCDetails()
     }
   }, [isOpen, npcId])
+
+  // ESC key handler for lightbox
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && selectedImage) {
+        setSelectedImage(null)
+      }
+    }
+    
+    if (selectedImage) {
+      document.addEventListener('keydown', handleKeyDown)
+      return () => document.removeEventListener('keydown', handleKeyDown)
+    }
+  }, [selectedImage])
 
   const handleToggleActive = async () => {
     if (!npc) return
@@ -792,13 +809,21 @@ export function NPCDetailModal({ npcId, isOpen, onClose, onUpdated }: NPCDetailM
                                 {/* Image Preview */}
                                 {item.image_url && (
                                   <div className="mt-3">
-                                    <div className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-surface">
+                                    <button
+                                      onClick={() => setSelectedImage(item.image_url)}
+                                      className="relative w-32 h-32 rounded-lg overflow-hidden border border-border bg-surface cursor-pointer hover:ring-2 ring-primary transition-all group"
+                                    >
                                       <img 
                                         src={item.image_url} 
                                         alt="Post image" 
                                         className="w-full h-full object-cover"
                                       />
-                                    </div>
+                                      <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-center justify-center">
+                                        <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                                          Click to expand
+                                        </span>
+                                      </div>
+                                    </button>
                                   </div>
                                 )}
                                 
@@ -926,6 +951,35 @@ export function NPCDetailModal({ npcId, isOpen, onClose, onUpdated }: NPCDetailM
           }}
           editNPC={npc}
         />
+      )}
+
+      {/* Image Lightbox */}
+      {selectedImage && (
+        <div 
+          className="fixed inset-0 z-[100] flex items-center justify-center bg-black/90 backdrop-blur-sm animate-in fade-in duration-200"
+          onClick={() => setSelectedImage(null)}
+        >
+          {/* Close Button */}
+          <button
+            onClick={() => setSelectedImage(null)}
+            className="absolute top-4 right-4 p-2 rounded-full bg-white/10 hover:bg-white/20 transition-colors"
+          >
+            <X size={24} className="text-white" />
+          </button>
+          
+          {/* Image */}
+          <img 
+            src={selectedImage} 
+            alt="Full size preview" 
+            className="max-w-[90vw] max-h-[90vh] object-contain rounded-lg shadow-2xl animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          />
+          
+          {/* Hint */}
+          <p className="absolute bottom-4 left-1/2 -translate-x-1/2 text-white/50 text-sm">
+            Click anywhere or press ESC to close
+          </p>
+        </div>
       )}
     </>
   )
